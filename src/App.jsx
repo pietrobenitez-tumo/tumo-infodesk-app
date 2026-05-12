@@ -685,13 +685,24 @@ export default function App() {
             {tutorAlerts.length > 0 && (
               <>
                 <h3>Alertas del tutor</h3>
-                {tutorAlerts.map(alert => (
-                  <div className="alert" key={alert.ID_ALERTA}>
-                    <strong>{alert.Alumno}</strong>
-                    <span>{alert.Tipo} · {alert.Motivo}</span>
-                    <span>{alert.Grupo_App}</span>
-                  </div>
-                ))}
+                {tutorAlerts.map(alert => {
+  const alertStudent = tutorStudents.find(
+    s => String(s.ID_ALUMNO) === String(alert.ID_ALUMNO)
+  );
+
+  return (
+    <button
+      className="alert alert-button"
+      key={alert.ID_ALERTA}
+      onClick={() => alertStudent && openStudentProfile(alertStudent)}
+    >
+      <strong>{alert.Alumno}</strong>
+      <span>{alert.Tipo} · {alert.Motivo}</span>
+      <span>{alert.Grupo_App}</span>
+      <small>Tocar para abrir ficha</small>
+    </button>
+  );
+})}
               </>
             )}
 
