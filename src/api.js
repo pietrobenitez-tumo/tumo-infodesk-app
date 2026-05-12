@@ -105,3 +105,6 @@ export function getAlerts() {
 export function saveAlertManagement(data) {
   return apiPost('saveAlertManagement', data);
 }
+export function getAttendanceForDate(data) {
+  return apiPost('getAttendanceForDate', data);
+}
