@@ -26,23 +26,24 @@ async function apiPost(action, payload = {}) {
   return data;
 }
 
-export async function getInitialData() {
-  const students = await apiGet('getStudents');
-  const alerts = await apiGet('getAlerts');
-  const openLoans = await apiGet('getOpenLoans');
-  const materials = await apiGet('getMaterials');
-
-  return {
-    ok: true,
-    students: students.students || [],
-    alerts: alerts.alerts || [],
-    openLoans: openLoans.loans || [],
-    materials: materials.materials || []
-  };
+export function getInitialData() {
+  return apiGet('getInitialData');
 }
 
 export function getStudents() {
   return apiGet('getStudents');
+}
+
+export function getTutors() {
+  return apiGet('getTutors');
+}
+
+export function getTutorData(tutor) {
+  return apiPost('getTutorData', { tutor });
+}
+
+export function getInfodeskData() {
+  return apiGet('getInfodeskData');
 }
 
 export function getStudentProfile(idAlumno) {
@@ -59,6 +60,10 @@ export function saveComment(data) {
 
 export function getMaterials() {
   return apiGet('getMaterials');
+}
+
+export function saveMaterial(data) {
+  return apiPost('saveMaterial', data);
 }
 
 export function createLoan(data) {
@@ -80,10 +85,7 @@ export function getAlerts() {
 export function createIncident(data) {
   return apiPost('createIncident', data);
 }
-export function saveIncident(data) {
-  return createIncident(data);
-}
 
-export function saveMaterial(data) {
-  return apiPost('saveMaterial', data);
+export function saveIncident(data) {
+  return apiPost('saveIncident', data);
 }
