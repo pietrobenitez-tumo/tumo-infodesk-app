@@ -1242,7 +1242,7 @@ function AttendanceDots({ items }) {
           return <span key={index} className="dot empty" title="Sin registro" />;
         }
 
-        const estado = String(item.Estado || '').toLowerCase();
+        const estado = normalizeStatus(item.Estado);
         const hasComment = Boolean(String(item.Comentario || '').trim());
 
         let className = 'dot';
@@ -1251,12 +1251,14 @@ function AttendanceDots({ items }) {
           className += ' absent';
         } else if (estado === 'justificada') {
           className += ' justified';
-        } else if (estado === 'presente' && hasComment) {
-          className += ' present-comment';
         } else if (estado === 'tarde') {
           className += ' late';
-        } else {
+        } else if (estado === 'presente' && hasComment) {
+          className += ' present-comment';
+        } else if (estado === 'presente') {
           className += ' present';
+        } else {
+          className += ' empty';
         }
 
         return (
@@ -1269,6 +1271,14 @@ function AttendanceDots({ items }) {
       })}
     </div>
   );
+}
+
+function normalizeStatus(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 }
 
 function today() {
