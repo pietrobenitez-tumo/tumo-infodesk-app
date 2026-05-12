@@ -11,7 +11,8 @@ import {
   saveAttendance,
   saveComment,
   saveWorkshopAttendance,
-  saveWorkshopFollowUp
+  saveWorkshopFollowUp,
+  saveAlertManagement
 } from './api';
 import './styles.css';
 
@@ -142,6 +143,7 @@ export default function App() {
       setStatus(res.message || 'Comentario guardado.');
       setCommentText('');
       await selectInfodeskStudent(infodeskStudent);
+      await loadInitial();
     } catch (error) {
       setStatus(error.message);
     }
@@ -194,6 +196,7 @@ export default function App() {
       setLoanMaterialId('');
       await refreshInfodesk();
       await selectInfodeskStudent(infodeskStudent);
+      await loadInitial();
     } catch (error) {
       setStatus(error.message);
     }
@@ -211,6 +214,7 @@ export default function App() {
 
       setStatus(res.message || 'Devolución registrada.');
       await refreshInfodesk();
+      await loadInitial();
 
       if (infodeskStudent) {
         await selectInfodeskStudent(infodeskStudent);
@@ -239,6 +243,7 @@ export default function App() {
       setIncidentText('');
       await refreshInfodesk();
       await selectInfodeskStudent(infodeskStudent);
+      await loadInitial();
     } catch (error) {
       setStatus(error.message);
     }
@@ -251,6 +256,7 @@ export default function App() {
       setSelectedGroup('');
       setAttendanceRows({});
       setProfile(null);
+      setSelectedStudent(null);
 
       const data = await getTutorData({
         tutorId: tutor.ID_TUTOR,
@@ -349,6 +355,42 @@ export default function App() {
 
       setStatus(res.message || 'Comentario guardado.');
       await openStudentProfile(selectedStudent);
+      await loadInitial();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function manageAlert(alert, estadoGestion) {
+    try {
+      const nota = prompt(`Nota para marcar como ${estadoGestion}:`) || '';
+
+      const res = await saveAlertManagement({
+        idAlerta: alert.ID_ALERTA,
+        fecha: alert.Fecha,
+        idAlumno: alert.ID_ALUMNO,
+        alumno: alert.Alumno,
+        grupoApp: alert.Grupo_App,
+        tutorTumo: alert.Tutor_TUMO,
+        tipo: alert.Tipo,
+        motivo: alert.Motivo,
+        estadoGestion,
+        gestionadoPor: selectedTutor?.Nombre || '',
+        nota
+      });
+
+      setStatus(res.message || 'Gestión de alerta guardada.');
+      await loadInitial();
+
+      if (selectedTutor) {
+        const data = await getTutorData({
+          tutorId: selectedTutor.ID_TUTOR,
+          tutor: selectedTutor.Nombre
+        });
+
+        setTutorStudents(data.students || []);
+        setTutorGroups(data.groups || []);
+      }
     } catch (error) {
       setStatus(error.message);
     }
@@ -423,6 +465,7 @@ export default function App() {
       });
 
       setStatus(res.message || 'Seguimiento de taller guardado.');
+      await loadInitial();
     } catch (error) {
       setStatus(error.message);
     }
@@ -431,28 +474,29 @@ export default function App() {
   const groupStudents = useMemo(() => {
     return tutorStudents.filter(s => s.Grupo_App === selectedGroup);
   }, [tutorStudents, selectedGroup]);
+
   const filteredTutorStudents = useMemo(() => {
-  const q = normalize(tutorSearch);
-  if (!q) return [];
+    const q = normalize(tutorSearch);
+    if (!q) return [];
 
-  return tutorStudents
-    .filter(s => {
-      const text = normalize(`
-        ${s.Nombre || ''}
-        ${s.Apellido || ''}
-        ${s.Nombre_Completo || ''}
-        ${s.CI || ''}
-        ${s.Documento || ''}
-        ${s.Cedula || ''}
-        ${s.Cédula || ''}
-        ${s.Usuario || ''}
-        ${s.Grupo_App || ''}
-      `);
+    return tutorStudents
+      .filter(s => {
+        const text = normalize(`
+          ${s.Nombre || ''}
+          ${s.Apellido || ''}
+          ${s.Nombre_Completo || ''}
+          ${s.CI || ''}
+          ${s.Documento || ''}
+          ${s.Cedula || ''}
+          ${s.Cédula || ''}
+          ${s.Usuario || ''}
+          ${s.Grupo_App || ''}
+        `);
 
-      return text.includes(q);
-    })
-    .slice(0, 20);
-}, [tutorStudents, tutorSearch]);
+        return text.includes(q);
+      })
+      .slice(0, 20);
+  }, [tutorStudents, tutorSearch]);
 
   const filteredInfodeskStudents = useMemo(() => {
     const q = normalize(infodeskSearch);
@@ -685,24 +729,51 @@ export default function App() {
             {tutorAlerts.length > 0 && (
               <>
                 <h3>Alertas del tutor</h3>
-                {tutorAlerts.map(alert => {
-  const alertStudent = tutorStudents.find(
-    s => String(s.ID_ALUMNO) === String(alert.ID_ALUMNO)
-  );
 
-  return (
-    <button
-      className="alert alert-button"
-      key={alert.ID_ALERTA}
-      onClick={() => alertStudent && openStudentProfile(alertStudent)}
-    >
-      <strong>{alert.Alumno}</strong>
-      <span>{alert.Tipo} · {alert.Motivo}</span>
-      <span>{alert.Grupo_App}</span>
-      <small>Tocar para abrir ficha</small>
-    </button>
-  );
-})}
+                {tutorAlerts.map(alert => {
+                  const alertStudent = tutorStudents.find(
+                    s => String(s.ID_ALUMNO) === String(alert.ID_ALUMNO)
+                  );
+
+                  return (
+                    <div className="alert" key={alert.ID_ALERTA}>
+                      <button
+                        className="alert-inner-button"
+                        onClick={() => alertStudent && openStudentProfile(alertStudent)}
+                      >
+                        <strong>{alert.Alumno}</strong>
+                        <span>{alert.Tipo} · {alert.Motivo}</span>
+                        <span>{alert.Grupo_App}</span>
+                        <span>Estado: {alert.Estado_Gestion || 'Pendiente'}</span>
+                        {alert.Nota && <span>Nota: {alert.Nota}</span>}
+                        <small>Tocar para abrir ficha</small>
+                      </button>
+
+                      <div className="alert-actions">
+                        <button
+                          className="btn secondary"
+                          onClick={() => manageAlert(alert, 'Contactado')}
+                        >
+                          Contactado
+                        </button>
+
+                        <button
+                          className="btn success"
+                          onClick={() => manageAlert(alert, 'Resuelto')}
+                        >
+                          Resuelto
+                        </button>
+
+                        <button
+                          className="btn danger"
+                          onClick={() => manageAlert(alert, 'Derivado')}
+                        >
+                          Derivado
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </>
             )}
 
@@ -720,26 +791,27 @@ export default function App() {
             <button className="btn success" onClick={saveGroupAttendance}>Guardar lista</button>
 
             <h3>Buscar alumno</h3>
-<input
-  value={tutorSearch}
-  onChange={e => setTutorSearch(e.target.value)}
-  placeholder="Buscar por nombre, apellido, cédula, usuario o grupo..."
-/>
+            <input
+              value={tutorSearch}
+              onChange={e => setTutorSearch(e.target.value)}
+              placeholder="Buscar por nombre, apellido, cédula, usuario o grupo..."
+            />
 
-{filteredTutorStudents.length > 0 && (
-  <div className="search-results">
-    {filteredTutorStudents.map(student => (
-      <button
-        className="search-item"
-        key={student.ID_ALUMNO}
-        onClick={() => openStudentProfile(student)}
-      >
-        <strong>{student.Nombre_Completo || `${student.Nombre || ''} ${student.Apellido || ''}`}</strong>
-        <span>{student.Grupo_App} · {student.Usuario}</span>
-      </button>
-    ))}
-  </div>
-)}
+            {filteredTutorStudents.length > 0 && (
+              <div className="search-results">
+                {filteredTutorStudents.map(student => (
+                  <button
+                    className="search-item"
+                    key={student.ID_ALUMNO}
+                    onClick={() => openStudentProfile(student)}
+                  >
+                    <strong>{student.Nombre_Completo || `${student.Nombre || ''} ${student.Apellido || ''}`}</strong>
+                    <span>{student.Grupo_App} · {student.Usuario}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             <h3>Alumnos</h3>
 
             {groupStudents.map(student => {
@@ -904,6 +976,7 @@ export default function App() {
               <div className="alert" key={alert.ID_ALERTA}>
                 <strong>{alert.Alumno}</strong>
                 <span>{alert.Tipo} · {alert.Motivo}</span>
+                <span>Estado: {alert.Estado_Gestion || 'Pendiente'}</span>
               </div>
             ))}
           </section>
