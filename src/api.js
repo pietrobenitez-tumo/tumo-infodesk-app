@@ -1,4 +1,4 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbxhxiIyPIkxcgDMs6MeqlMgqdIUiBeQlTWSie3FnoUvvhUp_YplcH0f2yMy92354FFq/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwnHG4HeRm0tavRPxhX9nYw3zR6m5D5lA7rHXrC_5_AyJ99R47Lds1bJzHwprTZM-0w/exec';
 
 async function apiGet(action) {
   const response = await fetch(`${API_URL}?action=${action}`);
@@ -30,20 +30,24 @@ export function getInitialData() {
   return apiGet('getInitialData');
 }
 
-export function getStudents() {
-  return apiGet('getStudents');
+export function getInfodeskData() {
+  return apiGet('getInfodeskData');
 }
 
 export function getTutors() {
   return apiGet('getTutors');
 }
 
-export function getTutorData(tutor) {
-  return apiPost('getTutorData', { tutor });
+export function getTutorData(data) {
+  return apiPost('getTutorData', data);
 }
 
-export function getInfodeskData() {
-  return apiGet('getInfodeskData');
+export function getWorkshopLeaders() {
+  return apiGet('getWorkshopLeaders');
+}
+
+export function getWorkshopLeaderData(data) {
+  return apiPost('getWorkshopLeaderData', data);
 }
 
 export function getStudentProfile(idAlumno) {
@@ -78,14 +82,22 @@ export function getOpenLoans() {
   return apiGet('getOpenLoans');
 }
 
-export function getAlerts() {
-  return apiGet('getAlerts');
+export function saveIncident(data) {
+  return apiPost('saveIncident', data);
 }
 
 export function createIncident(data) {
   return apiPost('createIncident', data);
 }
 
-export function saveIncident(data) {
-  return apiPost('saveIncident', data);
+export function saveWorkshopAttendance(data) {
+  return apiPost('saveWorkshopAttendance', data);
+}
+
+export function saveWorkshopFollowUp(data) {
+  return apiPost('saveWorkshopFollowUp', data);
+}
+
+export function getAlerts() {
+  return apiGet('getAlerts');
 }
