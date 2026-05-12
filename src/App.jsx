@@ -1,507 +1,513 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle,
-  BookOpen,
-  CheckCircle,
-  ClipboardList,
-  Headphones,
-  MessageSquare,
-  Search,
-  User,
-  XCircle
-} from 'lucide-react';
-import {
-  createLoan,
   getInitialData,
-  getOpenLoans,
+  getTutorData,
   getStudentProfile,
-  returnLoan,
   saveAttendance,
   saveComment,
-  saveIncident,
-  saveMaterial
+  createLoan,
+  returnLoan,
+  getInfodeskData
 } from './api';
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
+import './styles.css';
 
 export default function App() {
-  const [view, setView] = useState('inicio');
+  const [view, setView] = useState('home');
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
+
   const [students, setStudents] = useState([]);
-  const [groups, setGroups] = useState([]);
+  const [tutors, setTutors] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [openLoans, setOpenLoans] = useState([]);
-  const [query, setQuery] = useState('');
+
+  const [selectedTutor, setSelectedTutor] = useState('');
+  const [tutorStudents, setTutorStudents] = useState([]);
+  const [tutorGroups, setTutorGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState('');
+
+  const [attendanceDate, setAttendanceDate] = useState(today());
+  const [attendanceRows, setAttendanceRows] = useState({});
+
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [attendanceDate, setAttendanceDate] = useState(today());
-  const [attendanceState, setAttendanceState] = useState({});
-  const [attendanceComment, setAttendanceComment] = useState({});
-  const [commentForm, setCommentForm] = useState({ tipo: 'General', comentario: '', proximaAccion: '' });
-  const [incidentForm, setIncidentForm] = useState({ tipo: 'General', descripcion: '' });
-  const [loanForm, setLoanForm] = useState({ idMaterial: '', observaciones: '' });
-  const [materialForm, setMaterialForm] = useState({ Tipo: 'Auricular', Codigo: '', Estado: 'Disponible', Observaciones: '' });
+
+  const [search, setSearch] = useState('');
+  const [loanStudentId, setLoanStudentId] = useState('');
+  const [loanMaterialId, setLoanMaterialId] = useState('');
 
   useEffect(() => {
-    loadAll();
+    loadInitial();
   }, []);
 
-  async function loadAll() {
+  async function loadInitial() {
     try {
       setLoading(true);
       const data = await getInitialData();
+
       setStudents(data.students || []);
-      setGroups(data.groups || []);
+      setTutors(data.tutors || []);
       setAlerts(data.alerts || []);
       setMaterials(data.materials || []);
       setOpenLoans(data.openLoans || []);
-      if (!selectedGroup && data.groups?.length) setSelectedGroup(data.groups[0]);
+
       setStatus('');
-    } catch (err) {
-      setStatus(err.message);
+    } catch (error) {
+      setStatus(error.message);
     } finally {
       setLoading(false);
     }
   }
 
-  async function openStudent(student) {
+  async function refreshInfodesk() {
     try {
-      setSelectedStudent(student);
-      setView('alumno');
-      const res = await getStudentProfile(student.ID_ALUMNO);
-      setProfile(res);
-      setCommentForm({ tipo: 'General', comentario: '', proximaAccion: '' });
-      setIncidentForm({ tipo: 'General', descripcion: '' });
-      setLoanForm({ idMaterial: '', observaciones: '' });
-    } catch (err) {
-      setStatus(err.message);
+      const data = await getInfodeskData();
+      setMaterials(data.materials || []);
+      setOpenLoans(data.openLoans || []);
+      setStatus('Infodesk actualizado.');
+    } catch (error) {
+      setStatus(error.message);
     }
   }
 
-  const filteredStudents = useMemo(() => {
-    const q = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  async function selectTutor(tutor) {
+    try {
+      setSelectedTutor(tutor);
+      setSelectedGroup('');
+      setTutorStudents([]);
+      setTutorGroups([]);
+      setAttendanceRows({});
+      setProfile(null);
+      setSelectedStudent(null);
 
-    return students.filter(s => {
-      const text = `${s.Alumno} ${s.Usuario} ${s.Grupo} ${s.TUMO_ID}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return text.includes(q);
-    });
-  }, [students, query]);
+      const data = await getTutorData(tutor);
 
-  const groupStudents = useMemo(() => {
-    return students.filter(s => !selectedGroup || s.Grupo === selectedGroup);
-  }, [students, selectedGroup]);
+      setTutorStudents(data.students || []);
+      setTutorGroups(data.groups || []);
 
-  const availableMaterials = useMemo(() => {
-    return materials.filter(m => String(m.Estado || '').toLowerCase() === 'disponible');
-  }, [materials]);
+      setView('tutorPanel');
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
 
-  function markAttendance(idAlumno, estado) {
-    setAttendanceState(prev => ({ ...prev, [idAlumno]: estado }));
+  async function openProfile(student) {
+    try {
+      setSelectedStudent(student);
+      const data = await getStudentProfile(student.ID_ALUMNO);
+      setProfile(data);
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  function setAttendance(idAlumno, estado) {
+    setAttendanceRows(prev => ({
+      ...prev,
+      [idAlumno]: {
+        ...(prev[idAlumno] || {}),
+        estado
+      }
+    }));
+  }
+
+  function setAttendanceComment(idAlumno, comentario) {
+    setAttendanceRows(prev => ({
+      ...prev,
+      [idAlumno]: {
+        ...(prev[idAlumno] || {}),
+        comentario
+      }
+    }));
   }
 
   async function saveGroupAttendance() {
     try {
+      if (!selectedTutor) throw new Error('Seleccioná un tutor.');
+      if (!selectedGroup) throw new Error('Seleccioná un grupo.');
+
+      const groupStudents = tutorStudents.filter(s => s.Grupo === selectedGroup);
+
       const registros = groupStudents.map(s => ({
         idAlumno: s.ID_ALUMNO,
-        alumno: s.Alumno,
-        estado: attendanceState[s.ID_ALUMNO] || 'Presente',
-        comentario: attendanceComment[s.ID_ALUMNO] || ''
+        estado: attendanceRows[s.ID_ALUMNO]?.estado || 'Presente',
+        comentario: attendanceRows[s.ID_ALUMNO]?.comentario || ''
       }));
 
       const res = await saveAttendance({
         fecha: attendanceDate,
         grupo: selectedGroup,
-        registradoPor: 'Pietro',
+        registradoPor: selectedTutor,
         registros
       });
 
-      setStatus(res.message);
-      await loadAll();
-    } catch (err) {
-      setStatus(err.message);
+      setStatus(res.message || 'Asistencia guardada.');
+    } catch (error) {
+      setStatus(error.message);
     }
   }
 
-  async function saveSingleAttendance(estado) {
-    if (!selectedStudent) return;
-
+  async function addCommentToStudent() {
     try {
-      const res = await saveAttendance({
-        fecha: today(),
-        grupo: selectedStudent.Grupo,
-        registradoPor: 'Pietro',
-        registros: [{
-          idAlumno: selectedStudent.ID_ALUMNO,
-          alumno: selectedStudent.Alumno,
-          estado,
-          comentario: ''
-        }]
-      });
+      if (!selectedStudent) throw new Error('Seleccioná un alumno.');
 
-      setStatus(res.message);
-      await openStudent(selectedStudent);
-      await loadAll();
-    } catch (err) {
-      setStatus(err.message);
-    }
-  }
+      const comentario = prompt('Comentario:');
+      if (!comentario) return;
 
-  async function handleSaveComment() {
-    if (!selectedStudent) return;
-
-    try {
       const res = await saveComment({
         idAlumno: selectedStudent.ID_ALUMNO,
-        alumno: selectedStudent.Alumno,
-        tipo: commentForm.tipo,
-        comentario: commentForm.comentario,
-        proximaAccion: commentForm.proximaAccion,
-        registradoPor: 'Pietro'
+        tipo: 'General',
+        comentario,
+        registradoPor: selectedTutor || 'Tutor'
       });
 
-      setStatus(res.message);
-      await openStudent(selectedStudent);
-    } catch (err) {
-      setStatus(err.message);
+      setStatus(res.message || 'Comentario guardado.');
+      openProfile(selectedStudent);
+    } catch (error) {
+      setStatus(error.message);
     }
   }
 
-  async function handleSaveIncident() {
-    if (!selectedStudent) return;
-
+  async function createNewLoan() {
     try {
-      const res = await saveIncident({
-        idAlumno: selectedStudent.ID_ALUMNO,
-        alumno: selectedStudent.Alumno,
-        tipo: incidentForm.tipo,
-        descripcion: incidentForm.descripcion,
-        responsable: 'Pietro'
-      });
+      if (!loanStudentId) throw new Error('Seleccioná un alumno.');
+      if (!loanMaterialId) throw new Error('Seleccioná un material.');
 
-      setStatus(res.message);
-      setIncidentForm({ tipo: 'General', descripcion: '' });
-    } catch (err) {
-      setStatus(err.message);
-    }
-  }
+      const material = materials.find(m => String(m.ID_MATERIAL) === String(loanMaterialId));
 
-  async function handleCreateLoan() {
-    if (!selectedStudent) return;
-
-    try {
       const res = await createLoan({
-        idAlumno: selectedStudent.ID_ALUMNO,
-        alumno: selectedStudent.Alumno,
-        idMaterial: loanForm.idMaterial,
-        entregadoPor: 'Pietro',
-        observaciones: loanForm.observaciones
+        idAlumno: loanStudentId,
+        idMaterial: loanMaterialId,
+        material: material?.Tipo || '',
+        entregadoPor: 'Infodesk'
       });
 
-      setStatus(res.message);
-      await loadAll();
-      await openStudent(selectedStudent);
-    } catch (err) {
-      setStatus(err.message);
+      setStatus(res.message || 'Préstamo registrado.');
+      setLoanStudentId('');
+      setLoanMaterialId('');
+      await refreshInfodesk();
+    } catch (error) {
+      setStatus(error.message);
     }
   }
 
-  async function handleReturnLoan(loan) {
+  async function closeLoan(loan) {
     try {
       const res = await returnLoan({
         idPrestamo: loan.ID_PRESTAMO,
         idMaterial: loan.ID_MATERIAL,
-        recibidoPor: 'Pietro',
+        recibidoPor: 'Infodesk',
         estadoMaterial: 'Disponible'
       });
 
-      setStatus(res.message);
-      await loadAll();
-      if (selectedStudent) await openStudent(selectedStudent);
-    } catch (err) {
-      setStatus(err.message);
+      setStatus(res.message || 'Devolución registrada.');
+      await refreshInfodesk();
+    } catch (error) {
+      setStatus(error.message);
     }
   }
 
-  async function handleSaveMaterial() {
-    try {
-      const res = await saveMaterial(materialForm);
-      setStatus(res.message);
-      setMaterialForm({ Tipo: 'Auricular', Codigo: '', Estado: 'Disponible', Observaciones: '' });
-      await loadAll();
-    } catch (err) {
-      setStatus(err.message);
-    }
-  }
+  const filteredStudents = useMemo(() => {
+    const q = normalize(search);
 
-  function copyFamilyMessage() {
-    if (!profile?.alumno) return;
-    const name = profile.alumno.Nombre || profile.alumno.Alumno;
-    const text = `Buenas tardes, te escribo por ${name}. Notamos que tuvo dos inasistencias consecutivas en TUMO y queríamos consultar si está todo bien o si hay alguna dificultad para asistir. Quedamos atentos. Saludos, Pietro.`;
-    navigator.clipboard.writeText(text);
-    setStatus('Mensaje copiado.');
+    if (!q) return students;
+
+    return students.filter(s => {
+      const text = normalize(`${s.Nombre} ${s.Apellido} ${s.Usuario} ${s.Grupo} ${s.Tutor_TUMO}`);
+      return text.includes(q);
+    });
+  }, [students, search]);
+
+  const groupStudents = useMemo(() => {
+    if (!selectedGroup) return [];
+    return tutorStudents.filter(s => s.Grupo === selectedGroup);
+  }, [tutorStudents, selectedGroup]);
+
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="card">
+          <h1>Cargando app...</h1>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="page">
       <header className="header">
         <div>
-          <h1>Seguimiento TUMO + Infodesk</h1>
-          <p>Alumnos, asistencia, comentarios, préstamos, devoluciones y alertas.</p>
+          <h1>TUMO · Seguimiento e Infodesk</h1>
+          <p>Asistencia, seguimiento de alumnos, préstamos y tareas internas.</p>
         </div>
-        <button onClick={loadAll}>Actualizar</button>
+
+        {view !== 'home' && (
+          <button className="btn light" onClick={() => setView('home')}>
+            Volver al inicio
+          </button>
+        )}
       </header>
 
-      {status && <div className="status">{status}</div>}
-
-      <nav className="tabs">
-        <button className={view === 'inicio' ? 'active' : ''} onClick={() => setView('inicio')}>Inicio</button>
-        <button className={view === 'lista' ? 'active' : ''} onClick={() => setView('lista')}>Pasar lista</button>
-        <button className={view === 'alumno' ? 'active' : ''} onClick={() => setView('alumno')}>Alumno</button>
-        <button className={view === 'infodesk' ? 'active' : ''} onClick={() => setView('infodesk')}>Infodesk</button>
-      </nav>
-
-      {loading && <div className="card">Cargando datos...</div>}
-
-      {!loading && view === 'inicio' && (
-        <section>
-          <div className="kpis">
-            <Kpi icon={<User />} label="Alumnos" value={students.length} />
-            <Kpi icon={<AlertTriangle />} label="Alertas" value={alerts.length} />
-            <Kpi icon={<Headphones />} label="Préstamos abiertos" value={openLoans.length} />
-            <Kpi icon={<CheckCircle />} label="Materiales disponibles" value={availableMaterials.length} />
-          </div>
-
-          <div className="grid two">
-            <div className="card">
-              <h2>Alertas por asistencia</h2>
-              {alerts.length === 0 && <p className="muted">No hay alertas activas.</p>}
-              {alerts.map(a => (
-                <div key={`${a.ID_ALUMNO}-${a.Motivo}`} className="alertItem" onClick={() => openStudent(students.find(s => s.ID_ALUMNO === a.ID_ALUMNO))}>
-                  <strong>{a.Alumno}</strong>
-                  <span>{a.Motivo}</span>
-                  <small>{a.Ultimos_estados}</small>
-                </div>
-              ))}
-            </div>
-
-            <div className="card">
-              <h2>Préstamos abiertos</h2>
-              {openLoans.length === 0 && <p className="muted">No hay préstamos abiertos.</p>}
-              {openLoans.map(l => (
-                <div className="loanItem" key={l.ID_PRESTAMO}>
-                  <div>
-                    <strong>{l.Alumno}</strong>
-                    <span>{l.Material}</span>
-                    <small>{l.Fecha_Prestamo}</small>
-                  </div>
-                  <button onClick={() => handleReturnLoan(l)}>Devolver</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+      {status && (
+        <div className="status">
+          {status}
+        </div>
       )}
 
-      {!loading && view === 'lista' && (
-        <section className="card">
-          <div className="formRow">
-            <label>
-              Fecha
-              <input type="date" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
-            </label>
-            <label>
-              Grupo
-              <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)}>
-                {groups.map(g => <option key={g}>{g}</option>)}
-              </select>
-            </label>
-            <button onClick={saveGroupAttendance}>Guardar lista</button>
-          </div>
+      {view === 'home' && (
+        <main className="home-grid">
+          <button className="home-card" onClick={() => setView('infodesk')}>
+            <h2>Infodesk</h2>
+            <p>Préstamos, devoluciones, materiales y tareas de atención.</p>
+            <strong>{openLoans.length} préstamos abiertos</strong>
+          </button>
 
-          <div className="studentGrid">
-            {groupStudents.map(s => {
-              const current = attendanceState[s.ID_ALUMNO] || 'Presente';
+          <button className="home-card" onClick={() => setView('tutors')}>
+            <h2>Tutores</h2>
+            <p>Seleccionar tutor, ver grupos, pasar lista y hacer seguimiento.</p>
+            <strong>{tutors.length} tutores cargados</strong>
+          </button>
+        </main>
+      )}
+
+      {view === 'infodesk' && (
+        <main className="grid-two">
+          <section className="card">
+            <h2>Infodesk</h2>
+
+            <div className="mini-grid">
+              <div className="stat">
+                <strong>{materials.length}</strong>
+                <span>Materiales</span>
+              </div>
+              <div className="stat">
+                <strong>{openLoans.length}</strong>
+                <span>Préstamos abiertos</span>
+              </div>
+            </div>
+
+            <h3>Registrar préstamo</h3>
+
+            <label>Alumno</label>
+            <select value={loanStudentId} onChange={e => setLoanStudentId(e.target.value)}>
+              <option value="">Seleccionar alumno</option>
+              {students.map(s => (
+                <option key={s.ID_ALUMNO} value={s.ID_ALUMNO}>
+                  {s.Nombre} {s.Apellido} · {s.Grupo}
+                </option>
+              ))}
+            </select>
+
+            <label>Material disponible</label>
+            <select value={loanMaterialId} onChange={e => setLoanMaterialId(e.target.value)}>
+              <option value="">Seleccionar material</option>
+              {materials
+                .filter(m => String(m.Estado || '').toLowerCase() !== 'prestado')
+                .map(m => (
+                  <option key={m.ID_MATERIAL} value={m.ID_MATERIAL}>
+                    {m.Tipo} · {m.Codigo} · {m.Estado}
+                  </option>
+                ))}
+            </select>
+
+            <button className="btn success" onClick={createNewLoan}>
+              Registrar préstamo
+            </button>
+
+            <button className="btn secondary" onClick={refreshInfodesk}>
+              Actualizar Infodesk
+            </button>
+          </section>
+
+          <section className="card">
+            <h2>Préstamos abiertos</h2>
+
+            {openLoans.length === 0 && <p>No hay préstamos abiertos.</p>}
+
+            {openLoans.map(loan => (
+              <div className="list-item" key={loan.ID_PRESTAMO}>
+                <strong>{loan.Alumno || loan.ID_ALUMNO}</strong>
+                <span>{loan.Material} · {loan.Fecha_Prestamo}</span>
+                <span>{loan.Grupo}</span>
+                <button className="btn danger" onClick={() => closeLoan(loan)}>
+                  Registrar devolución
+                </button>
+              </div>
+            ))}
+          </section>
+        </main>
+      )}
+
+      {view === 'tutors' && (
+        <main className="card">
+          <h2>Seleccionar tutor</h2>
+
+          {tutors.length === 0 && (
+            <p>No se encontraron tutores. Revisá que la hoja ALUMNOS tenga la columna Tutor_TUMO.</p>
+          )}
+
+          <div className="tutor-grid">
+            {tutors.map(tutor => (
+              <button className="tutor-card" key={tutor} onClick={() => selectTutor(tutor)}>
+                {tutor}
+              </button>
+            ))}
+          </div>
+        </main>
+      )}
+
+      {view === 'tutorPanel' && (
+        <main className="grid-main">
+          <section className="card">
+            <h2>{selectedTutor}</h2>
+
+            <label>Grupo</label>
+            <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)}>
+              <option value="">Seleccionar grupo</option>
+              {tutorGroups.map(group => (
+                <option key={group} value={group}>
+                  {group}
+                </option>
+              ))}
+            </select>
+
+            <label>Fecha</label>
+            <input
+              type="date"
+              value={attendanceDate}
+              onChange={e => setAttendanceDate(e.target.value)}
+            />
+
+            <button className="btn success" onClick={saveGroupAttendance}>
+              Guardar lista del grupo
+            </button>
+
+            <h3>Alumnos del grupo</h3>
+
+            {!selectedGroup && <p>Seleccioná un grupo.</p>}
+
+            {groupStudents.map(student => {
+              const row = attendanceRows[student.ID_ALUMNO] || {};
+              const estado = row.estado || 'Presente';
 
               return (
-                <div className="studentCard" key={s.ID_ALUMNO}>
-                  <strong>{s.Alumno}</strong>
-                  <small>{s.Usuario}</small>
-                  <div className="states">
-                    {['Presente', 'Ausente', 'Justificada', 'Tarde'].map(st => (
+                <div className="student-card" key={student.ID_ALUMNO}>
+                  <div>
+                    <strong>{student.Nombre} {student.Apellido}</strong>
+                    <span>{student.Usuario}</span>
+                  </div>
+
+                  <div className="attendance-buttons">
+                    {['Presente', 'Ausente', 'Justificada', 'Tarde'].map(option => (
                       <button
-                        key={st}
-                        className={current === st ? 'selected' : ''}
-                        onClick={() => markAttendance(s.ID_ALUMNO, st)}
+                        key={option}
+                        className={`small-btn ${estado === option ? 'active' : ''}`}
+                        onClick={() => setAttendance(student.ID_ALUMNO, option)}
                       >
-                        {st[0]}
+                        {option}
                       </button>
                     ))}
                   </div>
+
                   <textarea
                     placeholder="Comentario del día..."
-                    value={attendanceComment[s.ID_ALUMNO] || ''}
-                    onChange={e => setAttendanceComment(prev => ({ ...prev, [s.ID_ALUMNO]: e.target.value }))}
+                    value={row.comentario || ''}
+                    onChange={e => setAttendanceComment(student.ID_ALUMNO, e.target.value)}
                   />
+
+                  <button className="btn secondary" onClick={() => openProfile(student)}>
+                    Ver ficha
+                  </button>
                 </div>
               );
             })}
-          </div>
-        </section>
-      )}
+          </section>
 
-      {!loading && view === 'alumno' && (
-        <section className="grid studentLayout">
-          <div className="card">
-            <h2><Search size={18} /> Buscar alumno</h2>
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Nombre, usuario, grupo..." />
-            <div className="resultList">
-              {filteredStudents.slice(0, 80).map(s => (
-                <button key={s.ID_ALUMNO} onClick={() => openStudent(s)}>
-                  <strong>{s.Alumno}</strong>
-                  <span>{s.Grupo}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <section className="card">
+            <h2>Ficha del alumno</h2>
 
-          <div className="card">
-            {!profile && <p className="muted">Seleccioná un alumno para ver la ficha.</p>}
+            {!profile && <p>Seleccioná un alumno para ver su ficha.</p>}
 
             {profile && (
               <>
-                <h2>{profile.alumno.Alumno}</h2>
-                <div className="infoGrid">
-                  <span>Usuario</span><strong>{profile.alumno.Usuario}</strong>
-                  <span>TUMO ID</span><strong>{profile.alumno.TUMO_ID}</strong>
-                  <span>Grupo</span><strong>{profile.alumno.Grupo}</strong>
-                  <span>Tutor TUMO</span><strong>{profile.alumno.Tutor_TUMO}</strong>
-                  <span>Contacto familia</span><strong>{profile.contacto?.Nombre_Tutor} {profile.contacto?.Apellido_Tutor}</strong>
-                  <span>Teléfono tutor</span><strong>{profile.contacto?.Telefono_Tutor}</strong>
-                  <span>Mail tutor</span><strong>{profile.contacto?.Mail_Tutor}</strong>
-                </div>
+                <h3>{profile.alumno.Nombre} {profile.alumno.Apellido}</h3>
 
-                <h3>Asistencia rápida</h3>
-                <div className="actionGrid">
-                  {['Presente', 'Ausente', 'Justificada', 'Tarde'].map(st => (
-                    <button key={st} onClick={() => saveSingleAttendance(st)}>{st}</button>
-                  ))}
-                </div>
+                <p><strong>Usuario:</strong> {profile.alumno.Usuario}</p>
+                <p><strong>Grupo:</strong> {profile.alumno.Grupo}</p>
+                <p><strong>Tutor:</strong> {profile.alumno.Tutor_TUMO}</p>
 
-                <button className="secondary" onClick={copyFamilyMessage}>Copiar mensaje para familia</button>
+                <h3>Contacto familiar</h3>
+                <p><strong>Tutor:</strong> {profile.contacto.Nombre_Tutor} {profile.contacto.Apellido_Tutor}</p>
+                <p><strong>Teléfono:</strong> {profile.contacto.Telefono_Tutor}</p>
+                <p><strong>Mail:</strong> {profile.contacto.Mail_Tutor}</p>
 
-                <h3>Agregar comentario</h3>
-                <div className="formRow">
-                  <select value={commentForm.tipo} onChange={e => setCommentForm({ ...commentForm, tipo: e.target.value })}>
-                    <option>General</option>
-                    <option>Asistencia</option>
-                    <option>Conducta</option>
-                    <option>Proceso de aprendizaje</option>
-                    <option>Comunicación con familia</option>
-                    <option>Bienestar</option>
-                  </select>
-                </div>
-                <textarea rows="3" placeholder="Comentario..." value={commentForm.comentario} onChange={e => setCommentForm({ ...commentForm, comentario: e.target.value })} />
-                <textarea rows="2" placeholder="Próxima acción..." value={commentForm.proximaAccion} onChange={e => setCommentForm({ ...commentForm, proximaAccion: e.target.value })} />
-                <button onClick={handleSaveComment}>Guardar comentario</button>
+                <button className="btn success" onClick={addCommentToStudent}>
+                  Agregar comentario
+                </button>
 
-                <h3>Registrar incidencia</h3>
-                <input placeholder="Tipo de incidencia" value={incidentForm.tipo} onChange={e => setIncidentForm({ ...incidentForm, tipo: e.target.value })} />
-                <textarea rows="2" placeholder="Descripción..." value={incidentForm.descripcion} onChange={e => setIncidentForm({ ...incidentForm, descripcion: e.target.value })} />
-                <button onClick={handleSaveIncident}>Guardar incidencia</button>
-
-                <h3>Préstamo rápido</h3>
-                <select value={loanForm.idMaterial} onChange={e => setLoanForm({ ...loanForm, idMaterial: e.target.value })}>
-                  <option value="">Seleccionar material disponible...</option>
-                  {availableMaterials.map(m => (
-                    <option key={m.ID_MATERIAL} value={m.ID_MATERIAL}>{m.Tipo} · {m.Codigo}</option>
-                  ))}
-                </select>
-                <input placeholder="Observaciones" value={loanForm.observaciones} onChange={e => setLoanForm({ ...loanForm, observaciones: e.target.value })} />
-                <button onClick={handleCreateLoan}>Registrar préstamo</button>
-
-                <h3>Préstamos abiertos del alumno</h3>
-                {profile.prestamosAbiertos?.length === 0 && <p className="muted">Sin préstamos abiertos.</p>}
-                {profile.prestamosAbiertos?.map(l => (
-                  <div className="loanItem" key={l.ID_PRESTAMO}>
-                    <div>
-                      <strong>{l.Material}</strong>
-                      <small>{l.Fecha_Prestamo}</small>
-                    </div>
-                    <button onClick={() => handleReturnLoan(l)}>Devolver</button>
+                <h3>Últimas asistencias</h3>
+                {(profile.asistencia || []).map(item => (
+                  <div className="list-item" key={item.ID_REGISTRO}>
+                    <strong>{item.Fecha} · {item.Estado}</strong>
+                    <span>{item.Comentario}</span>
                   </div>
                 ))}
 
-                <h3>Últimos comentarios</h3>
-                {profile.comentarios?.map(c => (
-                  <div className="historyItem" key={c.ID_COMENTARIO}>
-                    <strong>{c.Fecha} · {c.Tipo}</strong>
-                    <p>{c.Comentario}</p>
+                <h3>Comentarios</h3>
+                {(profile.comentarios || []).map(item => (
+                  <div className="list-item" key={item.ID_COMENTARIO}>
+                    <strong>{item.Fecha} · {item.Tipo}</strong>
+                    <span>{item.Comentario}</span>
                   </div>
                 ))}
               </>
             )}
-          </div>
-        </section>
+          </section>
+        </main>
       )}
 
-      {!loading && view === 'infodesk' && (
-        <section className="grid two">
-          <div className="card">
-            <h2><Headphones size={18}/> Materiales</h2>
-            <div className="formRow">
-              <select value={materialForm.Tipo} onChange={e => setMaterialForm({ ...materialForm, Tipo: e.target.value })}>
-                <option>Auricular</option>
-                <option>Mouse</option>
-                <option>Cargador</option>
-                <option>Otro</option>
-              </select>
-              <input placeholder="Código" value={materialForm.Codigo} onChange={e => setMaterialForm({ ...materialForm, Codigo: e.target.value })} />
-            </div>
-            <input placeholder="Observaciones" value={materialForm.Observaciones} onChange={e => setMaterialForm({ ...materialForm, Observaciones: e.target.value })} />
-            <button onClick={handleSaveMaterial}>Agregar material</button>
+      {view === 'search' && (
+        <main className="card">
+          <input
+            placeholder="Buscar alumno..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
 
-            <div className="materialList">
-              {materials.map(m => (
-                <div key={m.ID_MATERIAL} className="materialItem">
-                  <strong>{m.Tipo} · {m.Codigo}</strong>
-                  <span className={`pill ${String(m.Estado).toLowerCase()}`}>{m.Estado}</span>
-                </div>
-              ))}
+          {filteredStudents.map(s => (
+            <div className="list-item" key={s.ID_ALUMNO}>
+              <strong>{s.Nombre} {s.Apellido}</strong>
+              <span>{s.Grupo}</span>
             </div>
-          </div>
+          ))}
+        </main>
+      )}
 
-          <div className="card">
-            <h2><ClipboardList size={18}/> Préstamos abiertos</h2>
-            {openLoans.map(l => (
-              <div className="loanItem" key={l.ID_PRESTAMO}>
-                <div>
-                  <strong>{l.Alumno}</strong>
-                  <span>{l.Material}</span>
-                  <small>{l.Fecha_Prestamo}</small>
-                </div>
-                <button onClick={() => handleReturnLoan(l)}>Devolver</button>
-              </div>
-            ))}
-          </div>
+      {alerts.length > 0 && view !== 'home' && (
+        <section className="card">
+          <h2>Alertas</h2>
+
+          {alerts.map(alert => (
+            <div className="alert" key={alert.ID_ALUMNO}>
+              <strong>{alert.Alumno}</strong>
+              <span>{alert.Motivo}</span>
+              <span>{alert.Ultimos_Estados}</span>
+            </div>
+          ))}
         </section>
       )}
     </div>
   );
 }
 
-function Kpi({ icon, label, value }) {
-  return (
-    <div className="kpi">
-      <div className="kpiIcon">{icon}</div>
-      <div>
-        <strong>{value}</strong>
-        <span>{label}</span>
-      </div>
-    </div>
-  );
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function normalize(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
