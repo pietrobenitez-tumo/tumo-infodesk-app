@@ -44,6 +44,7 @@ export default function App() {
   const [tutorStudents, setTutorStudents] = useState([]);
   const [tutorGroups, setTutorGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState('');
+  const [tutorSearch, setTutorSearch] = useState('');
   const [attendanceDate, setAttendanceDate] = useState(today());
   const [attendanceRows, setAttendanceRows] = useState({});
 
@@ -430,6 +431,28 @@ export default function App() {
   const groupStudents = useMemo(() => {
     return tutorStudents.filter(s => s.Grupo_App === selectedGroup);
   }, [tutorStudents, selectedGroup]);
+  const filteredTutorStudents = useMemo(() => {
+  const q = normalize(tutorSearch);
+  if (!q) return [];
+
+  return tutorStudents
+    .filter(s => {
+      const text = normalize(`
+        ${s.Nombre || ''}
+        ${s.Apellido || ''}
+        ${s.Nombre_Completo || ''}
+        ${s.CI || ''}
+        ${s.Documento || ''}
+        ${s.Cedula || ''}
+        ${s.Cédula || ''}
+        ${s.Usuario || ''}
+        ${s.Grupo_App || ''}
+      `);
+
+      return text.includes(q);
+    })
+    .slice(0, 20);
+}, [tutorStudents, tutorSearch]);
 
   const filteredInfodeskStudents = useMemo(() => {
     const q = normalize(infodeskSearch);
@@ -685,6 +708,27 @@ export default function App() {
 
             <button className="btn success" onClick={saveGroupAttendance}>Guardar lista</button>
 
+            <h3>Buscar alumno</h3>
+<input
+  value={tutorSearch}
+  onChange={e => setTutorSearch(e.target.value)}
+  placeholder="Buscar por nombre, apellido, cédula, usuario o grupo..."
+/>
+
+{filteredTutorStudents.length > 0 && (
+  <div className="search-results">
+    {filteredTutorStudents.map(student => (
+      <button
+        className="search-item"
+        key={student.ID_ALUMNO}
+        onClick={() => openStudentProfile(student)}
+      >
+        <strong>{student.Nombre_Completo || `${student.Nombre || ''} ${student.Apellido || ''}`}</strong>
+        <span>{student.Grupo_App} · {student.Usuario}</span>
+      </button>
+    ))}
+  </div>
+)}
             <h3>Alumnos</h3>
 
             {groupStudents.map(student => {
