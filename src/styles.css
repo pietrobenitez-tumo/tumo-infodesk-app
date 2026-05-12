@@ -316,3 +316,48 @@ textarea {
   opacity: 0.9;
   transform: translateY(-1px);
 }
+
+.attendance-dots {
+  display: flex;
+  gap: 5px;
+  margin: 5px 0 7px;
+  align-items: center;
+}
+
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  display: inline-block;
+  border: 1px solid #d1d5db;
+}
+
+.dot.present {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+.dot.absent {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.dot.justified {
+  background: #38bdf8;
+  border-color: #38bdf8;
+}
+
+.dot.late {
+  background: #f97316;
+  border-color: #f97316;
+}
+
+.dot.present-comment {
+  background: linear-gradient(90deg, #16a34a 50%, #f97316 50%);
+  border-color: #16a34a;
+}
+
+.dot.empty {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
