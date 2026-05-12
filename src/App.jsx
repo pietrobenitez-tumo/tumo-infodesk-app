@@ -37,6 +37,7 @@ export default function App() {
   const [loanMaterialId, setLoanMaterialId] = useState('');
   const [incidentText, setIncidentText] = useState('');
   const [commentText, setCommentText] = useState('');
+  const [lateTime, setLateTime] = useState(currentTime());
 
   const [selectedTutor, setSelectedTutor] = useState(null);
   const [tutorStudents, setTutorStudents] = useState([]);
@@ -89,6 +90,7 @@ export default function App() {
       setCommentText('');
       setIncidentText('');
       setLoanMaterialId('');
+      setLateTime(currentTime());
     } catch (error) {
       setStatus(error.message);
     }
@@ -145,6 +147,7 @@ export default function App() {
     try {
       if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
       if (!infodeskStudent) throw new Error('Seleccioná un alumno.');
+      if (!lateTime) throw new Error('Indicá la hora de llegada.');
 
       const res = await saveAttendance({
         fecha: today(),
@@ -154,13 +157,15 @@ export default function App() {
           {
             idAlumno: infodeskStudent.ID_ALUMNO,
             estado: 'Tarde',
-            comentario: 'Llegada tarde registrada desde Infodesk'
+            horaLlegada: lateTime,
+            comentario: `Llegada tarde registrada desde Infodesk a las ${lateTime}`
           }
         ]
       });
 
       setStatus(res.message || 'Llegada tarde registrada.');
       await selectInfodeskStudent(infodeskStudent);
+      await loadInitial();
     } catch (error) {
       setStatus(error.message);
     }
@@ -260,7 +265,8 @@ export default function App() {
       ...prev,
       [idAlumno]: {
         ...(prev[idAlumno] || {}),
-        estado
+        estado,
+        horaLlegada: estado === 'Tarde' ? (prev[idAlumno]?.horaLlegada || currentTime()) : ''
       }
     }));
   }
@@ -275,6 +281,16 @@ export default function App() {
     }));
   }
 
+  function setAttendanceLateTime(idAlumno, horaLlegada) {
+    setAttendanceRows(prev => ({
+      ...prev,
+      [idAlumno]: {
+        ...(prev[idAlumno] || {}),
+        horaLlegada
+      }
+    }));
+  }
+
   async function saveGroupAttendance() {
     try {
       if (!selectedTutor) throw new Error('Seleccioná un tutor.');
@@ -285,6 +301,7 @@ export default function App() {
       const registros = groupStudents.map(s => ({
         idAlumno: s.ID_ALUMNO,
         estado: attendanceRows[s.ID_ALUMNO]?.estado || 'Presente',
+        horaLlegada: attendanceRows[s.ID_ALUMNO]?.horaLlegada || '',
         comentario: attendanceRows[s.ID_ALUMNO]?.comentario || ''
       }));
 
@@ -296,6 +313,7 @@ export default function App() {
       });
 
       setStatus(res.message || 'Lista guardada.');
+      await loadInitial();
     } catch (error) {
       setStatus(error.message);
     }
@@ -434,6 +452,11 @@ export default function App() {
       .slice(0, 20);
   }, [students, infodeskSearch]);
 
+  const tutorAlerts = useMemo(() => {
+    if (!selectedTutor) return [];
+    return alerts.filter(alert => normalize(alert.Tutor_TUMO) === normalize(selectedTutor.Nombre));
+  }, [alerts, selectedTutor]);
+
   if (loading) {
     return (
       <div className="page">
@@ -533,6 +556,13 @@ export default function App() {
               <>
                 <h3>Acciones rápidas</h3>
 
+                <label>Hora de llegada tarde</label>
+                <input
+                  type="time"
+                  value={lateTime}
+                  onChange={e => setLateTime(e.target.value)}
+                />
+
                 <button className="btn success" onClick={registerLateArrival}>
                   Registrar llegada tarde
                 </button>
@@ -600,6 +630,9 @@ export default function App() {
                 </button>
               </div>
             ))}
+
+            <h3>Historial general de préstamos</h3>
+            <LoanHistory students={students} />
           </section>
         </main>
       )}
@@ -622,6 +655,19 @@ export default function App() {
         <main className="grid-main">
           <section className="card">
             <h2>{selectedTutor?.Nombre}</h2>
+
+            {tutorAlerts.length > 0 && (
+              <>
+                <h3>Alertas del tutor</h3>
+                {tutorAlerts.map(alert => (
+                  <div className="alert" key={alert.ID_ALERTA}>
+                    <strong>{alert.Alumno}</strong>
+                    <span>{alert.Tipo} · {alert.Motivo}</span>
+                    <span>{alert.Grupo_App}</span>
+                  </div>
+                ))}
+              </>
+            )}
 
             <label>Grupo</label>
             <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)}>
@@ -658,6 +704,17 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+
+                  {estado === 'Tarde' && (
+                    <>
+                      <label>Hora de llegada</label>
+                      <input
+                        type="time"
+                        value={row.horaLlegada || currentTime()}
+                        onChange={e => setAttendanceLateTime(student.ID_ALUMNO, e.target.value)}
+                      />
+                    </>
+                  )}
 
                   <textarea
                     placeholder="Comentario del día..."
@@ -820,7 +877,10 @@ function InfodeskStudentProfile({ profile }) {
       <h3>Últimas asistencias</h3>
       {(profile.attendance || []).slice(0, 5).map(item => (
         <div className="list-item" key={item.ID_REGISTRO}>
-          <strong>{item.Fecha} · {item.Estado}</strong>
+          <strong>
+            {item.Fecha} · {item.Estado}
+            {item.Hora_Llegada ? ` · ${item.Hora_Llegada}` : ''}
+          </strong>
           <span>{item.Comentario}</span>
         </div>
       ))}
@@ -841,14 +901,28 @@ function InfodeskStudentProfile({ profile }) {
         </div>
       ))}
 
-      <h3>Préstamos</h3>
-      {(profile.loans || []).slice(0, 5).map(item => (
+      <h3>Historial de préstamos del alumno</h3>
+      {(profile.loans || []).length === 0 && <p>No hay préstamos registrados.</p>}
+      {(profile.loans || []).map(item => (
         <div className="list-item" key={item.ID_PRESTAMO}>
           <strong>{item.Fecha_Prestamo} · {item.Material}</strong>
-          <span>{item.Estado}</span>
+          <span>Estado: {item.Estado}</span>
+          <span>Entregado por: {item.Entregado_Por}</span>
+          {item.Fecha_Devolucion && <span>Devuelto: {item.Fecha_Devolucion}</span>}
+          {item.Recibido_Por && <span>Recibido por: {item.Recibido_Por}</span>}
+          {item.Observaciones && <span>{item.Observaciones}</span>}
         </div>
       ))}
     </>
+  );
+}
+
+function LoanHistory({ students }) {
+  return (
+    <p>
+      El historial completo por alumno se ve al abrir su perfil. Los préstamos abiertos aparecen arriba
+      para registrar devoluciones rápidamente.
+    </p>
   );
 }
 
@@ -886,7 +960,10 @@ function StudentProfile({ profile, onAddComment }) {
       <h3>Últimas asistencias</h3>
       {(profile.attendance || []).map(item => (
         <div className="list-item" key={item.ID_REGISTRO}>
-          <strong>{item.Fecha} · {item.Estado}</strong>
+          <strong>
+            {item.Fecha} · {item.Estado}
+            {item.Hora_Llegada ? ` · ${item.Hora_Llegada}` : ''}
+          </strong>
           <span>{item.Comentario}</span>
         </div>
       ))}
@@ -898,12 +975,28 @@ function StudentProfile({ profile, onAddComment }) {
           <span>{item.Comentario}</span>
         </div>
       ))}
+
+      <h3>Historial de préstamos</h3>
+      {(profile.loans || []).length === 0 && <p>No hay préstamos registrados.</p>}
+      {(profile.loans || []).map(item => (
+        <div className="list-item" key={item.ID_PRESTAMO}>
+          <strong>{item.Fecha_Prestamo} · {item.Material}</strong>
+          <span>Estado: {item.Estado}</span>
+          <span>Entregado por: {item.Entregado_Por}</span>
+          {item.Fecha_Devolucion && <span>Devuelto: {item.Fecha_Devolucion}</span>}
+          {item.Recibido_Por && <span>Recibido por: {item.Recibido_Por}</span>}
+        </div>
+      ))}
     </section>
   );
 }
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function currentTime() {
+  return new Date().toTimeString().slice(0, 5);
 }
 
 function normalize(value) {
