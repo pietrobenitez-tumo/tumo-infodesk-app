@@ -821,8 +821,9 @@ export default function App() {
               return (
                 <div className="student-card" key={student.ID_ALUMNO}>
                   <strong>{student.Nombre_Completo}</strong>
+                  <AttendanceDots items={student.Ultimas_Asistencias || []} />
                   <span>{student.Usuario}</span>
-
+                  
                   <div className="attendance-buttons">
                     {['Presente', 'Ausente', 'Justificada', 'Tarde'].map(option => (
                       <button
@@ -1137,6 +1138,49 @@ function StudentProfile({ profile, onAddComment }) {
   );
 }
 
+function AttendanceDots({ items }) {
+  const lastFive = [...items].slice(-5);
+  const emptyCount = Math.max(0, 5 - lastFive.length);
+  const dots = [
+    ...Array(emptyCount).fill(null),
+    ...lastFive
+  ];
+
+  return (
+    <div className="attendance-dots">
+      {dots.map((item, index) => {
+        if (!item) {
+          return <span key={index} className="dot empty" title="Sin registro" />;
+        }
+
+        const estado = String(item.Estado || '').toLowerCase();
+        const hasComment = Boolean(String(item.Comentario || '').trim());
+
+        let className = 'dot';
+
+        if (estado === 'ausente') {
+          className += ' absent';
+        } else if (estado === 'justificada') {
+          className += ' justified';
+        } else if (estado === 'presente' && hasComment) {
+          className += ' present-comment';
+        } else if (estado === 'tarde') {
+          className += ' late';
+        } else {
+          className += ' present';
+        }
+
+        return (
+          <span
+            key={index}
+            className={className}
+            title={`${item.Fecha || ''} · ${item.Estado || ''}${hasComment ? ' · con comentario' : ''}`}
+          />
+        );
+      })}
+    </div>
+  );
+}
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
