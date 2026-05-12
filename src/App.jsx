@@ -62,10 +62,9 @@ export default function App() {
     loadInitial();
   }, []);
 
-  async function loadInitial(showLoader = true) {
+  async function loadInitial() {
     try {
-      if (showLoader) setLoading(true);
-
+      setLoading(true);
       const data = await getInitialData();
       setInitialData(data);
       setInfodeskPeople(data.infodeskPeople || []);
@@ -74,7 +73,18 @@ export default function App() {
     } catch (error) {
       setStatus(error.message);
     } finally {
-      if (showLoader) setLoading(false);
+      setLoading(false);
+    }
+  }
+
+  async function refreshInitialWithoutLoading() {
+    try {
+      const data = await getInitialData();
+      setInitialData(data);
+      setInfodeskPeople(data.infodeskPeople || []);
+      setAlerts(data.alerts || []);
+    } catch (error) {
+      setStatus(error.message);
     }
   }
 
@@ -145,7 +155,7 @@ export default function App() {
       setStatus(res.message || 'Comentario guardado.');
       setCommentText('');
       await selectInfodeskStudent(infodeskStudent);
-      await loadInitial(false);
+      await refreshInitialWithoutLoading();
     } catch (error) {
       setStatus(error.message);
     }
@@ -173,7 +183,7 @@ export default function App() {
 
       setStatus(res.message || 'Llegada tarde registrada.');
       await selectInfodeskStudent(infodeskStudent);
-      await loadInitial(false);
+      await refreshInitialWithoutLoading();
     } catch (error) {
       setStatus(error.message);
     }
@@ -198,7 +208,7 @@ export default function App() {
       setLoanMaterialId('');
       await refreshInfodesk();
       await selectInfodeskStudent(infodeskStudent);
-      await loadInitial(false);
+      await refreshInitialWithoutLoading();
     } catch (error) {
       setStatus(error.message);
     }
@@ -216,7 +226,7 @@ export default function App() {
 
       setStatus(res.message || 'Devolución registrada.');
       await refreshInfodesk();
-      await loadInitial(false);
+      await refreshInitialWithoutLoading();
 
       if (infodeskStudent) {
         await selectInfodeskStudent(infodeskStudent);
@@ -245,7 +255,7 @@ export default function App() {
       setIncidentText('');
       await refreshInfodesk();
       await selectInfodeskStudent(infodeskStudent);
-      await loadInitial(false);
+      await refreshInitialWithoutLoading();
     } catch (error) {
       setStatus(error.message);
     }
@@ -272,12 +282,25 @@ export default function App() {
     }
   }
 
+  async function refreshTutorData(tutor = selectedTutor) {
+    try {
+      if (!tutor) return;
+
+      const data = await getTutorData({
+        tutorId: tutor.ID_TUTOR,
+        tutor: tutor.Nombre
+      });
+
+      setTutorStudents(data.students || []);
+      setTutorGroups(data.groups || []);
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
   async function loadAttendanceForSelectedDate(group = selectedGroup, date = attendanceDate) {
     try {
-      if (!group || !date) {
-        setAttendanceRows({});
-        return;
-      }
+      if (!group || !date) return;
 
       const data = await getAttendanceForDate({
         grupo: group,
@@ -354,17 +377,13 @@ export default function App() {
         registros
       });
 
-      setStatus(`${res.message || 'Lista guardada.'} Creados: ${res.created || 0}. Actualizados: ${res.updated || 0}.`);
+      setStatus(
+        `${res.message || 'Lista guardada.'} Creados: ${res.created || 0}. Actualizados: ${res.updated || 0}.`
+      );
 
-      const data = await getTutorData({
-        tutorId: selectedTutor.ID_TUTOR,
-        tutor: selectedTutor.Nombre
-      });
-
-      setTutorStudents(data.students || []);
-      setTutorGroups(data.groups || []);
+      await refreshTutorData();
       await loadAttendanceForSelectedDate(selectedGroup, attendanceDate);
-      await loadInitial(false);
+      await refreshInitialWithoutLoading();
     } catch (error) {
       setStatus(error.message);
     }
@@ -396,7 +415,7 @@ export default function App() {
 
       setStatus(res.message || 'Comentario guardado.');
       await openStudentProfile(selectedStudent);
-      await loadInitial(false);
+      await refreshInitialWithoutLoading();
     } catch (error) {
       setStatus(error.message);
     }
@@ -421,17 +440,8 @@ export default function App() {
       });
 
       setStatus(res.message || 'Gestión de alerta guardada.');
-      await loadInitial(false);
-
-      if (selectedTutor) {
-        const data = await getTutorData({
-          tutorId: selectedTutor.ID_TUTOR,
-          tutor: selectedTutor.Nombre
-        });
-
-        setTutorStudents(data.students || []);
-        setTutorGroups(data.groups || []);
-      }
+      await refreshInitialWithoutLoading();
+      await refreshTutorData();
     } catch (error) {
       setStatus(error.message);
     }
@@ -506,7 +516,7 @@ export default function App() {
       });
 
       setStatus(res.message || 'Seguimiento de taller guardado.');
-      await loadInitial(false);
+      await refreshInitialWithoutLoading();
     } catch (error) {
       setStatus(error.message);
     }
@@ -877,9 +887,17 @@ export default function App() {
               return (
                 <div className="student-card" key={student.ID_ALUMNO}>
                   <strong>{student.Nombre_Completo}</strong>
-                  <AttendanceDots items={student.Ultimas_Asistencias || []} />
-                  <span>{student.Usuario}</span>
 
+                  <AttendanceDots
+                    items={buildAttendanceDotsItems(
+                      student.Ultimas_Asistencias || [],
+                      attendanceRows[student.ID_ALUMNO],
+                      attendanceDate
+                    )}
+                  />
+
+                  <span>{student.Usuario}</span>
+                  
                   <div className="attendance-buttons">
                     {['Presente', 'Ausente', 'Justificada', 'Tarde'].map(option => (
                       <button
@@ -1194,6 +1212,21 @@ function StudentProfile({ profile, onAddComment }) {
   );
 }
 
+function buildAttendanceDotsItems(items, currentRow, currentDate) {
+  const cleanItems = [...items].filter(item => String(item.Fecha) !== String(currentDate));
+
+  if (currentRow && currentRow.estado) {
+    cleanItems.push({
+      Fecha: currentDate,
+      Estado: currentRow.estado,
+      Hora_Llegada: currentRow.horaLlegada || '',
+      Comentario: currentRow.comentario || ''
+    });
+  }
+
+  return cleanItems.slice(-5);
+}
+
 function AttendanceDots({ items }) {
   const lastFive = [...items].slice(-5);
   const emptyCount = Math.max(0, 5 - lastFive.length);
@@ -1209,14 +1242,14 @@ function AttendanceDots({ items }) {
           return <span key={index} className="dot empty" title="Sin registro" />;
         }
 
-        const estado = normalize(item.Estado || '');
+        const estado = String(item.Estado || '').toLowerCase();
         const hasComment = Boolean(String(item.Comentario || '').trim());
 
         let className = 'dot';
 
         if (estado === 'ausente') {
           className += ' absent';
-        } else if (estado === 'justificada' || estado === 'justificado') {
+        } else if (estado === 'justificada') {
           className += ' justified';
         } else if (estado === 'presente' && hasComment) {
           className += ' present-comment';
