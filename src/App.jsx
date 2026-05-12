@@ -12,7 +12,8 @@ import {
   saveComment,
   saveWorkshopAttendance,
   saveWorkshopFollowUp,
-  saveAlertManagement
+  saveAlertManagement,
+  getAttendanceForDate
 } from './api';
 import './styles.css';
 
@@ -61,9 +62,10 @@ export default function App() {
     loadInitial();
   }, []);
 
-  async function loadInitial() {
+  async function loadInitial(showLoader = true) {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
+
       const data = await getInitialData();
       setInitialData(data);
       setInfodeskPeople(data.infodeskPeople || []);
@@ -72,7 +74,7 @@ export default function App() {
     } catch (error) {
       setStatus(error.message);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   }
 
@@ -143,7 +145,7 @@ export default function App() {
       setStatus(res.message || 'Comentario guardado.');
       setCommentText('');
       await selectInfodeskStudent(infodeskStudent);
-      await loadInitial();
+      await loadInitial(false);
     } catch (error) {
       setStatus(error.message);
     }
@@ -171,7 +173,7 @@ export default function App() {
 
       setStatus(res.message || 'Llegada tarde registrada.');
       await selectInfodeskStudent(infodeskStudent);
-      await loadInitial();
+      await loadInitial(false);
     } catch (error) {
       setStatus(error.message);
     }
@@ -196,7 +198,7 @@ export default function App() {
       setLoanMaterialId('');
       await refreshInfodesk();
       await selectInfodeskStudent(infodeskStudent);
-      await loadInitial();
+      await loadInitial(false);
     } catch (error) {
       setStatus(error.message);
     }
@@ -214,7 +216,7 @@ export default function App() {
 
       setStatus(res.message || 'Devolución registrada.');
       await refreshInfodesk();
-      await loadInitial();
+      await loadInitial(false);
 
       if (infodeskStudent) {
         await selectInfodeskStudent(infodeskStudent);
@@ -243,7 +245,7 @@ export default function App() {
       setIncidentText('');
       await refreshInfodesk();
       await selectInfodeskStudent(infodeskStudent);
-      await loadInitial();
+      await loadInitial(false);
     } catch (error) {
       setStatus(error.message);
     }
@@ -265,6 +267,36 @@ export default function App() {
 
       setTutorStudents(data.students || []);
       setTutorGroups(data.groups || []);
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function loadAttendanceForSelectedDate(group = selectedGroup, date = attendanceDate) {
+    try {
+      if (!group || !date) {
+        setAttendanceRows({});
+        return;
+      }
+
+      const data = await getAttendanceForDate({
+        grupo: group,
+        fecha: date
+      });
+
+      const rows = {};
+
+      Object.keys(data.records || {}).forEach(idAlumno => {
+        const record = data.records[idAlumno];
+
+        rows[idAlumno] = {
+          estado: record.Estado || 'Presente',
+          horaLlegada: record.Hora_Llegada || '',
+          comentario: record.Comentario || ''
+        };
+      });
+
+      setAttendanceRows(rows);
     } catch (error) {
       setStatus(error.message);
     }
@@ -322,8 +354,17 @@ export default function App() {
         registros
       });
 
-      setStatus(res.message || 'Lista guardada.');
-      await loadInitial();
+      setStatus(`${res.message || 'Lista guardada.'} Creados: ${res.created || 0}. Actualizados: ${res.updated || 0}.`);
+
+      const data = await getTutorData({
+        tutorId: selectedTutor.ID_TUTOR,
+        tutor: selectedTutor.Nombre
+      });
+
+      setTutorStudents(data.students || []);
+      setTutorGroups(data.groups || []);
+      await loadAttendanceForSelectedDate(selectedGroup, attendanceDate);
+      await loadInitial(false);
     } catch (error) {
       setStatus(error.message);
     }
@@ -355,7 +396,7 @@ export default function App() {
 
       setStatus(res.message || 'Comentario guardado.');
       await openStudentProfile(selectedStudent);
-      await loadInitial();
+      await loadInitial(false);
     } catch (error) {
       setStatus(error.message);
     }
@@ -380,7 +421,7 @@ export default function App() {
       });
 
       setStatus(res.message || 'Gestión de alerta guardada.');
-      await loadInitial();
+      await loadInitial(false);
 
       if (selectedTutor) {
         const data = await getTutorData({
@@ -465,7 +506,7 @@ export default function App() {
       });
 
       setStatus(res.message || 'Seguimiento de taller guardado.');
-      await loadInitial();
+      await loadInitial(false);
     } catch (error) {
       setStatus(error.message);
     }
@@ -778,7 +819,14 @@ export default function App() {
             )}
 
             <label>Grupo</label>
-            <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)}>
+            <select
+              value={selectedGroup}
+              onChange={e => {
+                const group = e.target.value;
+                setSelectedGroup(group);
+                loadAttendanceForSelectedDate(group, attendanceDate);
+              }}
+            >
               <option value="">Seleccionar grupo</option>
               {tutorGroups.map(group => (
                 <option key={group} value={group}>{group}</option>
@@ -786,7 +834,15 @@ export default function App() {
             </select>
 
             <label>Fecha</label>
-            <input type="date" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
+            <input
+              type="date"
+              value={attendanceDate}
+              onChange={e => {
+                const date = e.target.value;
+                setAttendanceDate(date);
+                loadAttendanceForSelectedDate(selectedGroup, date);
+              }}
+            />
 
             <button className="btn success" onClick={saveGroupAttendance}>Guardar lista</button>
 
@@ -823,7 +879,7 @@ export default function App() {
                   <strong>{student.Nombre_Completo}</strong>
                   <AttendanceDots items={student.Ultimas_Asistencias || []} />
                   <span>{student.Usuario}</span>
-                  
+
                   <div className="attendance-buttons">
                     {['Presente', 'Ausente', 'Justificada', 'Tarde'].map(option => (
                       <button
@@ -1153,14 +1209,14 @@ function AttendanceDots({ items }) {
           return <span key={index} className="dot empty" title="Sin registro" />;
         }
 
-        const estado = String(item.Estado || '').toLowerCase();
+        const estado = normalize(item.Estado || '');
         const hasComment = Boolean(String(item.Comentario || '').trim());
 
         let className = 'dot';
 
         if (estado === 'ausente') {
           className += ' absent';
-        } else if (estado === 'justificada') {
+        } else if (estado === 'justificada' || estado === 'justificado') {
           className += ' justified';
         } else if (estado === 'presente' && hasComment) {
           className += ' present-comment';
@@ -1181,6 +1237,7 @@ function AttendanceDots({ items }) {
     </div>
   );
 }
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
