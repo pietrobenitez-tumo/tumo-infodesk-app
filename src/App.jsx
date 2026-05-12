@@ -28,6 +28,7 @@ export default function App() {
   const [selectedInfodesk, setSelectedInfodesk] = useState('');
   const [materials, setMaterials] = useState([]);
   const [openLoans, setOpenLoans] = useState([]);
+  const [allLoans, setAllLoans] = useState([]);
   const [incidents, setIncidents] = useState([]);
 
   const [infodeskSearch, setInfodeskSearch] = useState('');
@@ -82,6 +83,7 @@ export default function App() {
       setStudents(data.students || []);
       setMaterials(data.materials || []);
       setOpenLoans(data.openLoans || []);
+      setAllLoans(data.allLoans || []);
       setIncidents(data.incidents || []);
 
       setInfodeskSearch('');
@@ -102,6 +104,7 @@ export default function App() {
       setStudents(data.students || []);
       setMaterials(data.materials || []);
       setOpenLoans(data.openLoans || []);
+      setAllLoans(data.allLoans || []);
       setIncidents(data.incidents || []);
       setStatus('Infodesk actualizado.');
     } catch (error) {
@@ -632,7 +635,7 @@ export default function App() {
             ))}
 
             <h3>Historial general de préstamos</h3>
-            <LoanHistory students={students} />
+            <GeneralLoanHistory loans={allLoans} />
           </section>
         </main>
       )}
@@ -917,12 +920,27 @@ function InfodeskStudentProfile({ profile }) {
   );
 }
 
-function LoanHistory({ students }) {
+function GeneralLoanHistory({ loans }) {
+  if (!loans || loans.length === 0) {
+    return <p>No hay préstamos registrados.</p>;
+  }
+
   return (
-    <p>
-      El historial completo por alumno se ve al abrir su perfil. Los préstamos abiertos aparecen arriba
-      para registrar devoluciones rápidamente.
-    </p>
+    <div>
+      {loans.map(loan => (
+        <div className="list-item" key={loan.ID_PRESTAMO}>
+          <strong>{loan.Fecha_Prestamo} · {loan.Alumno || loan.ID_ALUMNO}</strong>
+          <span>Material: {loan.Material}</span>
+          <span>Estado: {loan.Estado}</span>
+          <span>Grupo: {loan.Grupo_App}</span>
+          <span>Tutor TUMO: {loan.Tutor_TUMO}</span>
+          <span>Entregado por: {loan.Entregado_Por}</span>
+          {loan.Fecha_Devolucion && <span>Fecha devolución: {loan.Fecha_Devolucion}</span>}
+          {loan.Recibido_Por && <span>Recibido por: {loan.Recibido_Por}</span>}
+          {loan.Observaciones && <span>Observaciones: {loan.Observaciones}</span>}
+        </div>
+      ))}
+    </div>
   );
 }
 
