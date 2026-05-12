@@ -29,9 +29,14 @@ export default function App() {
   const [materials, setMaterials] = useState([]);
   const [openLoans, setOpenLoans] = useState([]);
   const [incidents, setIncidents] = useState([]);
-  const [loanStudentId, setLoanStudentId] = useState('');
+
+  const [infodeskSearch, setInfodeskSearch] = useState('');
+  const [infodeskStudent, setInfodeskStudent] = useState(null);
+  const [infodeskProfile, setInfodeskProfile] = useState(null);
+
   const [loanMaterialId, setLoanMaterialId] = useState('');
   const [incidentText, setIncidentText] = useState('');
+  const [commentText, setCommentText] = useState('');
 
   const [selectedTutor, setSelectedTutor] = useState(null);
   const [tutorStudents, setTutorStudents] = useState([]);
@@ -71,11 +76,19 @@ export default function App() {
     try {
       setSelectedInfodesk(personName);
       setView('infodesk');
+
       const data = await getInfodeskData();
       setStudents(data.students || []);
       setMaterials(data.materials || []);
       setOpenLoans(data.openLoans || []);
       setIncidents(data.incidents || []);
+
+      setInfodeskSearch('');
+      setInfodeskStudent(null);
+      setInfodeskProfile(null);
+      setCommentText('');
+      setIncidentText('');
+      setLoanMaterialId('');
     } catch (error) {
       setStatus(error.message);
     }
@@ -94,25 +107,84 @@ export default function App() {
     }
   }
 
+  async function selectInfodeskStudent(student) {
+    try {
+      setInfodeskStudent(student);
+      const data = await getStudentProfile(student.ID_ALUMNO);
+      setInfodeskProfile(data);
+      setStatus('');
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function saveInfodeskComment() {
+    try {
+      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
+      if (!infodeskStudent) throw new Error('Seleccioná un alumno.');
+      if (!commentText.trim()) throw new Error('Escribí un comentario.');
+
+      const res = await saveComment({
+        idAlumno: infodeskStudent.ID_ALUMNO,
+        tipo: 'Infodesk',
+        comentario: commentText,
+        proximaAccion: '',
+        registradoPor: selectedInfodesk,
+        estado: 'Pendiente'
+      });
+
+      setStatus(res.message || 'Comentario guardado.');
+      setCommentText('');
+      await selectInfodeskStudent(infodeskStudent);
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function registerLateArrival() {
+    try {
+      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
+      if (!infodeskStudent) throw new Error('Seleccioná un alumno.');
+
+      const res = await saveAttendance({
+        fecha: today(),
+        grupo: infodeskStudent.Grupo_App || '',
+        registradoPor: selectedInfodesk,
+        registros: [
+          {
+            idAlumno: infodeskStudent.ID_ALUMNO,
+            estado: 'Tarde',
+            comentario: 'Llegada tarde registrada desde Infodesk'
+          }
+        ]
+      });
+
+      setStatus(res.message || 'Llegada tarde registrada.');
+      await selectInfodeskStudent(infodeskStudent);
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
   async function createNewLoan() {
     try {
       if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
-      if (!loanStudentId) throw new Error('Seleccioná un alumno.');
+      if (!infodeskStudent) throw new Error('Seleccioná un alumno.');
       if (!loanMaterialId) throw new Error('Seleccioná un material.');
 
       const material = materials.find(m => String(m.ID_MATERIAL) === String(loanMaterialId));
 
       const res = await createLoan({
-        idAlumno: loanStudentId,
+        idAlumno: infodeskStudent.ID_ALUMNO,
         idMaterial: loanMaterialId,
         material: material?.Tipo || '',
         personaInfodesk: selectedInfodesk
       });
 
       setStatus(res.message || 'Préstamo registrado.');
-      setLoanStudentId('');
       setLoanMaterialId('');
       await refreshInfodesk();
+      await selectInfodeskStudent(infodeskStudent);
     } catch (error) {
       setStatus(error.message);
     }
@@ -130,6 +202,10 @@ export default function App() {
 
       setStatus(res.message || 'Devolución registrada.');
       await refreshInfodesk();
+
+      if (infodeskStudent) {
+        await selectInfodeskStudent(infodeskStudent);
+      }
     } catch (error) {
       setStatus(error.message);
     }
@@ -138,9 +214,11 @@ export default function App() {
   async function createNewIncident() {
     try {
       if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
+      if (!infodeskStudent) throw new Error('Seleccioná un alumno.');
       if (!incidentText.trim()) throw new Error('Escribí la incidencia.');
 
       const res = await saveIncident({
+        idAlumno: infodeskStudent.ID_ALUMNO,
         descripcion: incidentText,
         tipo: 'Infodesk',
         estado: 'Abierta',
@@ -151,6 +229,7 @@ export default function App() {
       setStatus(res.message || 'Incidencia registrada.');
       setIncidentText('');
       await refreshInfodesk();
+      await selectInfodeskStudent(infodeskStudent);
     } catch (error) {
       setStatus(error.message);
     }
@@ -331,6 +410,30 @@ export default function App() {
     return tutorStudents.filter(s => s.Grupo_App === selectedGroup);
   }, [tutorStudents, selectedGroup]);
 
+  const filteredInfodeskStudents = useMemo(() => {
+    const q = normalize(infodeskSearch);
+    if (!q) return [];
+
+    return students
+      .filter(s => {
+        const text = normalize(`
+          ${s.Nombre || ''}
+          ${s.Apellido || ''}
+          ${s.Nombre_Completo || ''}
+          ${s.CI || ''}
+          ${s.Documento || ''}
+          ${s.Cedula || ''}
+          ${s.Cédula || ''}
+          ${s.Usuario || ''}
+          ${s.Grupo_App || ''}
+          ${s.Tutor_TUMO || ''}
+        `);
+
+        return text.includes(q);
+      })
+      .slice(0, 20);
+  }, [students, infodeskSearch]);
+
   if (loading) {
     return (
       <div className="page">
@@ -362,7 +465,7 @@ export default function App() {
         <main className="home-grid three">
           <button className="home-card" onClick={() => setView('selectInfodesk')}>
             <h2>Infodesk</h2>
-            <p>Préstamos, devoluciones, materiales e incidencias.</p>
+            <p>Préstamos, devoluciones, materiales, incidencias y llegadas tarde.</p>
             <strong>{initialData.summary?.openLoans || 0} préstamos abiertos</strong>
           </button>
 
@@ -399,56 +502,102 @@ export default function App() {
       )}
 
       {view === 'infodesk' && (
-        <main className="grid-two">
+        <main className="grid-main">
           <section className="card">
             <h2>Infodesk</h2>
             <p><strong>Registrando como:</strong> {selectedInfodesk}</p>
 
-            <h3>Registrar préstamo</h3>
-
-            <label>Alumno</label>
-            <select value={loanStudentId} onChange={e => setLoanStudentId(e.target.value)}>
-              <option value="">Seleccionar alumno</option>
-              {students.map(s => (
-                <option key={s.ID_ALUMNO} value={s.ID_ALUMNO}>
-                  {s.Nombre_Completo || `${s.Nombre} ${s.Apellido}`} · {s.Grupo_App}
-                </option>
-              ))}
-            </select>
-
-            <label>Material disponible</label>
-            <select value={loanMaterialId} onChange={e => setLoanMaterialId(e.target.value)}>
-              <option value="">Seleccionar material</option>
-              {materials
-                .filter(m => String(m.Estado || '').toLowerCase() !== 'prestado')
-                .map(m => (
-                  <option key={m.ID_MATERIAL} value={m.ID_MATERIAL}>
-                    {m.Tipo} · {m.Codigo} · {m.Estado}
-                  </option>
-                ))}
-            </select>
-
-            <button className="btn success" onClick={createNewLoan}>Registrar préstamo</button>
-
-            <h3>Registrar incidencia</h3>
-            <textarea
-              placeholder="Describir incidencia..."
-              value={incidentText}
-              onChange={e => setIncidentText(e.target.value)}
+            <h3>Buscar alumno</h3>
+            <input
+              value={infodeskSearch}
+              onChange={e => setInfodeskSearch(e.target.value)}
+              placeholder="Buscar por nombre, apellido, cédula, usuario o grupo..."
             />
-            <button className="btn secondary" onClick={createNewIncident}>Guardar incidencia</button>
+
+            {filteredInfodeskStudents.length > 0 && (
+              <div className="search-results">
+                {filteredInfodeskStudents.map(student => (
+                  <button
+                    className="search-item"
+                    key={student.ID_ALUMNO}
+                    onClick={() => selectInfodeskStudent(student)}
+                  >
+                    <strong>{student.Nombre_Completo || `${student.Nombre || ''} ${student.Apellido || ''}`}</strong>
+                    <span>{student.Grupo_App} · {student.Usuario}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {infodeskStudent && (
+              <>
+                <h3>Acciones rápidas</h3>
+
+                <button className="btn success" onClick={registerLateArrival}>
+                  Registrar llegada tarde
+                </button>
+
+                <label>Comentario</label>
+                <textarea
+                  placeholder="Comentario desde Infodesk..."
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                />
+                <button className="btn secondary" onClick={saveInfodeskComment}>
+                  Guardar comentario
+                </button>
+
+                <label>Incidencia</label>
+                <textarea
+                  placeholder="Describir incidencia..."
+                  value={incidentText}
+                  onChange={e => setIncidentText(e.target.value)}
+                />
+                <button className="btn secondary" onClick={createNewIncident}>
+                  Guardar incidencia
+                </button>
+
+                <h3>Préstamo de material</h3>
+                <label>Material disponible</label>
+                <select value={loanMaterialId} onChange={e => setLoanMaterialId(e.target.value)}>
+                  <option value="">Seleccionar material</option>
+                  {materials
+                    .filter(m => String(m.Estado || '').toLowerCase() !== 'prestado')
+                    .map(m => (
+                      <option key={m.ID_MATERIAL} value={m.ID_MATERIAL}>
+                        {m.Tipo} · {m.Codigo} · {m.Estado}
+                      </option>
+                    ))}
+                </select>
+
+                <button className="btn success" onClick={createNewLoan}>
+                  Registrar préstamo
+                </button>
+              </>
+            )}
           </section>
 
           <section className="card">
-            <h2>Préstamos abiertos</h2>
+            <h2>Perfil del alumno</h2>
 
+            {!infodeskProfile && <p>Buscá y seleccioná un alumno.</p>}
+
+            {infodeskProfile && (
+              <InfodeskStudentProfile profile={infodeskProfile} />
+            )}
+
+            <h3>Préstamos abiertos</h3>
             {openLoans.map(loan => (
               <div className="list-item" key={loan.ID_PRESTAMO}>
                 <strong>{loan.Alumno}</strong>
                 <span>{loan.Material} · {loan.Fecha_Prestamo}</span>
                 <span>{loan.Grupo_App}</span>
-                <button className="btn success" onClick={() => closeLoan(loan)}>Devolver</button>
-                <button className="btn danger" onClick={() => closeLoan(loan, 'Dañado', 'Dañado')}>Marcar dañado</button>
+                <button className="btn success" onClick={() => closeLoan(loan)}>
+                  Devolver
+                </button>
+                <button className="btn danger" onClick={() => closeLoan(loan, 'Dañado', 'Dañado')}>
+                  Marcar dañado
+                </button>
               </div>
             ))}
           </section>
@@ -649,6 +798,60 @@ export default function App() {
   );
 }
 
+function InfodeskStudentProfile({ profile }) {
+  const s = profile.student || {};
+  const c = profile.contact || {};
+
+  return (
+    <>
+      <h3>{s.Nombre_Completo}</h3>
+      <p><strong>Grupo:</strong> {s.Grupo_App}</p>
+      <p><strong>Estado TUMO:</strong> {s.Estado_TUMO}</p>
+      <p><strong>Tutor TUMO:</strong> {s.Tutor_TUMO}</p>
+      <p><strong>Usuario:</strong> {s.Usuario}</p>
+      <p><strong>CI:</strong> {s.CI || s.Documento || s.Cedula || s.Cédula}</p>
+
+      <h3>Contacto familiar</h3>
+      <p><strong>Tutor:</strong> {c.Nombre_Tutor} {c.Apellido_Tutor}</p>
+      <p><strong>Relación:</strong> {c.Relacion}</p>
+      <p><strong>Teléfono:</strong> {c.Telefono_Tutor}</p>
+      <p><strong>Mail:</strong> {c.Mail_Tutor}</p>
+
+      <h3>Últimas asistencias</h3>
+      {(profile.attendance || []).slice(0, 5).map(item => (
+        <div className="list-item" key={item.ID_REGISTRO}>
+          <strong>{item.Fecha} · {item.Estado}</strong>
+          <span>{item.Comentario}</span>
+        </div>
+      ))}
+
+      <h3>Comentarios recientes</h3>
+      {(profile.comments || []).slice(0, 5).map(item => (
+        <div className="list-item" key={item.ID_COMENTARIO}>
+          <strong>{item.Fecha} · {item.Tipo}</strong>
+          <span>{item.Comentario}</span>
+        </div>
+      ))}
+
+      <h3>Incidencias</h3>
+      {(profile.incidents || []).slice(0, 5).map(item => (
+        <div className="list-item" key={item.ID_INCIDENCIA}>
+          <strong>{item.Fecha} · {item.Tipo}</strong>
+          <span>{item.Descripcion}</span>
+        </div>
+      ))}
+
+      <h3>Préstamos</h3>
+      {(profile.loans || []).slice(0, 5).map(item => (
+        <div className="list-item" key={item.ID_PRESTAMO}>
+          <strong>{item.Fecha_Prestamo} · {item.Material}</strong>
+          <span>{item.Estado}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function StudentProfile({ profile, onAddComment }) {
   if (!profile) {
     return (
@@ -701,4 +904,11 @@ function StudentProfile({ profile, onAddComment }) {
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function normalize(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
