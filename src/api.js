@@ -101,3 +101,7 @@ export function saveWorkshopFollowUp(data) {
 export function getAlerts() {
   return apiGet('getAlerts');
 }
+
+export function saveAlertManagement(data) {
+  return apiPost('saveAlertManagement', data);
+}
