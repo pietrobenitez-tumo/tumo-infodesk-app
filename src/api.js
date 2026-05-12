@@ -80,3 +80,10 @@ export function getAlerts() {
 export function createIncident(data) {
   return apiPost('createIncident', data);
 }
+export function saveIncident(data) {
+  return createIncident(data);
+}
+
+export function saveMaterial(data) {
+  return apiPost('saveMaterial', data);
+}
