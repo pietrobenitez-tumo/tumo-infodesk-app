@@ -405,11 +405,13 @@ export default function App() {
     try {
       if (!group || !date) return;
 
-      const data = await getAttendanceForDate({
-        grupo: group,
-        fecha: date
-      });
+      const currentGroupStudents = tutorStudents.filter(s => s.Grupo_App === group);
 
+const data = await getAttendanceForDate({
+  grupo: group,
+  fecha: date,
+  idAlumnos: currentGroupStudents.map(s => s.ID_ALUMNO)
+});
       const rows = {};
 
       Object.keys(data.records || {}).forEach(idAlumno => {
