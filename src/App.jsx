@@ -522,6 +522,39 @@ export default function App() {
     }
   }
 
+  async function createTaskForInfodeskFromTutor(student = null) {
+  try {
+    if (!selectedTutor) throw new Error('Seleccioná un tutor.');
+
+    const titulo = prompt('Título de la tarea para Infodesk:');
+    if (!titulo || !titulo.trim()) return;
+
+    const descripcion = prompt('Descripción para Infodesk:') || '';
+
+    const prioridad = prompt(
+      'Prioridad: Baja, Media, Alta o Urgente',
+      'Media'
+    ) || 'Media';
+
+    const studentText = student
+      ? `\n\nAlumno vinculado: ${student.Nombre_Completo || ''} · ${student.Grupo_App || ''} · ${student.Usuario || ''}`
+      : '';
+
+    const res = await saveInfodeskTask({
+      titulo,
+      descripcion: `${descripcion}${studentText}`,
+      prioridad,
+      estado: 'Pendiente',
+      personaInfodesk: selectedTutor.Nombre
+    });
+
+    setStatus(res.message || 'Tarea enviada a Infodesk.');
+    await refreshInitialWithoutLoading();
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
   async function manageAlert(alert, estadoGestion) {
     try {
       const nota = prompt(`Nota para marcar como ${estadoGestion}:`) || '';
@@ -950,6 +983,12 @@ export default function App() {
         <main className="grid-main">
           <section className="card">
             <h2>{selectedTutor?.Nombre}</h2>
+            <button
+  className="btn secondary"
+  onClick={() => createTaskForInfodeskFromTutor()}
+>
+  Enviar tarea a Infodesk
+</button>
 
             {tutorAlerts.length > 0 && (
               <>
@@ -1104,6 +1143,12 @@ export default function App() {
                   <button className="btn secondary" onClick={() => openStudentProfile(student)}>
                     Ver ficha
                   </button>
+                  <button
+  className="btn secondary"
+  onClick={() => createTaskForInfodeskFromTutor(student)}
+>
+  Tarea para Infodesk
+</button>
                 </div>
               );
             })}
