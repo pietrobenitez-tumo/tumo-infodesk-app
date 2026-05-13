@@ -70,6 +70,14 @@ export default function App() {
   useEffect(() => {
     loadInitial();
   }, []);
+  useEffect(() => {
+  if (!selectedTutor) return;
+  if (!selectedGroup) return;
+  if (!attendanceDate) return;
+  if (!tutorStudents.length) return;
+
+  loadAttendanceForSelectedDate(selectedGroup, attendanceDate);
+}, [selectedTutor, selectedGroup, attendanceDate, tutorStudents.length]);
 
   async function loadInitial() {
     try {
@@ -401,35 +409,38 @@ export default function App() {
     }
   }
 
-  async function loadAttendanceForSelectedDate(group = selectedGroup, date = attendanceDate) {
-    try {
-      if (!group || !date) return;
+ async function loadAttendanceForSelectedDate(group = selectedGroup, date = attendanceDate) {
+  try {
+    if (!group || !date) return;
 
-      const currentGroupStudents = tutorStudents.filter(s => s.Grupo_App === group);
+    const currentGroupStudents = tutorStudents.filter(s => s.Grupo_App === group);
+    const idAlumnos = currentGroupStudents.map(s => s.ID_ALUMNO);
 
-const data = await getAttendanceForDate({
-  grupo: group,
-  fecha: date,
-  idAlumnos: currentGroupStudents.map(s => s.ID_ALUMNO)
-});
-      const rows = {};
+    if (idAlumnos.length === 0) return;
 
-      Object.keys(data.records || {}).forEach(idAlumno => {
-        const record = data.records[idAlumno];
+    const data = await getAttendanceForDate({
+      grupo: group,
+      fecha: date,
+      idAlumnos
+    });
 
-        rows[idAlumno] = {
-          estado: record.Estado || 'Presente',
-          horaLlegada: record.Hora_Llegada || '',
-          comentario: record.Comentario || ''
-        };
-      });
+    const rows = {};
 
-      setAttendanceRows(rows);
-    } catch (error) {
-      setStatus(error.message);
-    }
+    Object.keys(data.records || {}).forEach(idAlumno => {
+      const record = data.records[idAlumno];
+
+      rows[String(idAlumno)] = {
+        estado: record.Estado || 'Presente',
+        horaLlegada: record.Hora_Llegada || '',
+        comentario: record.Comentario || ''
+      };
+    });
+
+    setAttendanceRows(rows);
+  } catch (error) {
+    setStatus(error.message);
   }
-
+}
   function setAttendance(idAlumno, estado) {
     setAttendanceRows(prev => ({
       ...prev,
@@ -475,13 +486,16 @@ const data = await getAttendanceForDate({
 
       const groupStudents = tutorStudents.filter(s => s.Grupo_App === selectedGroup);
 
-      const registros = groupStudents.map(s => ({
-        idAlumno: s.ID_ALUMNO,
-        estado: attendanceRows[s.ID_ALUMNO]?.estado || 'Presente',
-        horaLlegada: attendanceRows[s.ID_ALUMNO]?.horaLlegada || '',
-        comentario: attendanceRows[s.ID_ALUMNO]?.comentario || ''
-      }));
+      const registros = groupStudents.map(s => {
+  const row = attendanceRows[String(s.ID_ALUMNO)] || {};
 
+  return {
+    idAlumno: s.ID_ALUMNO,
+    estado: row.estado || 'Presente',
+    horaLlegada: row.horaLlegada || '',
+    comentario: row.comentario || ''
+  };
+});
       const res = await saveAttendance({
         fecha: attendanceDate,
         grupo: selectedGroup,
@@ -1105,7 +1119,7 @@ const data = await getAttendanceForDate({
             <h3>Alumnos</h3>
 
             {groupStudents.map(student => {
-              const row = attendanceRows[student.ID_ALUMNO] || {};
+              const row = attendanceRows[String(student.ID_ALUMNO)] || {};
               const estado = row.estado || 'Presente';
 
               return (
