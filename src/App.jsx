@@ -40,7 +40,6 @@ export default function App() {
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState('Media');
   const [showTaskHistory, setShowTaskHistory] = useState(false);
-  const [showLoanHistory, setShowLoanHistory] = useState(false);
 
   const [infodeskSearch, setInfodeskSearch] = useState('');
   const [infodeskStudent, setInfodeskStudent] = useState(null);
@@ -58,6 +57,7 @@ export default function App() {
   const [tutorSearch, setTutorSearch] = useState('');
   const [attendanceDate, setAttendanceDate] = useState(today());
   const [attendanceRows, setAttendanceRows] = useState({});
+  const [commentOpenRows, setCommentOpenRows] = useState({});
 
   const [selectedLeader, setSelectedLeader] = useState(null);
   const [workshops, setWorkshops] = useState([]);
@@ -369,6 +369,7 @@ export default function App() {
       setView('tutor');
       setSelectedGroup('');
       setAttendanceRows({});
+      setCommentOpenRows({});
       setProfile(null);
       setSelectedStudent(null);
 
@@ -445,6 +446,13 @@ export default function App() {
         ...(prev[idAlumno] || {}),
         comentario
       }
+    }));
+  }
+
+  function toggleAttendanceComment(idAlumno) {
+    setCommentOpenRows(prev => ({
+      ...prev,
+      [idAlumno]: !prev[idAlumno]
     }));
   }
 
@@ -960,12 +968,8 @@ export default function App() {
               </div>
             ))}
 
-            <button
-              className="btn secondary"
-              onClick={() => setShowLoanHistory(true)}
-            >
-              Ver historial de préstamos
-            </button>
+            <h3>Historial general de préstamos</h3>
+            <GeneralLoanHistory loans={allLoans} />
           </section>
         </main>
       )}
@@ -1139,24 +1143,45 @@ export default function App() {
                     </>
                   )}
 
-                  <textarea
-                    placeholder="Comentario del día..."
-                    value={row.comentario || ''}
-                    onChange={e => setAttendanceComment(student.ID_ALUMNO, e.target.value)}
-                  />
+                  <div className="student-actions compact-actions">
+                    <button
+                      className={`tiny-btn ${row.comentario ? 'has-comment' : ''}`}
+                      onClick={() => toggleAttendanceComment(student.ID_ALUMNO)}
+                    >
+                      {row.comentario ? 'Editar comentario' : 'Comentario'}
+                    </button>
 
-                  <button className="btn secondary" onClick={() => openStudentProfile(student)}>
-                    Ver ficha
-                  </button>
-                  <button
-  className="btn secondary"
-  onClick={() => createTaskForInfodeskFromTutor(student)}
->
-  Tarea para Infodesk
-</button>
+                    <button className="tiny-btn" onClick={() => openStudentProfile(student)}>
+                      Ver ficha
+                    </button>
+
+                    <button
+                      className="tiny-btn"
+                      onClick={() => createTaskForInfodeskFromTutor(student)}
+                    >
+                      Tarea Infodesk
+                    </button>
+                  </div>
+
+                  {commentOpenRows[student.ID_ALUMNO] && (
+                    <textarea
+                      className="compact-comment"
+                      placeholder="Comentario del día..."
+                      value={row.comentario || ''}
+                      onChange={e => setAttendanceComment(student.ID_ALUMNO, e.target.value)}
+                    />
+                  )}
                 </div>
               );
             })}
+
+            {selectedGroup && groupStudents.length > 0 && (
+              <div className="bottom-save-attendance">
+                <button className="btn success" onClick={saveGroupAttendance}>
+                  Guardar lista
+                </button>
+              </div>
+            )}
           </section>
 
           <StudentProfile profile={profile} onAddComment={addCommentToStudent} />
@@ -1280,21 +1305,6 @@ export default function App() {
             ))}
           </section>
         </main>
-      )}
-
-      {showLoanHistory && (
-        <div className="modal-backdrop">
-          <div className="modal-card">
-            <div className="modal-header">
-              <h2>Historial general de préstamos</h2>
-              <button className="btn light" onClick={() => setShowLoanHistory(false)}>
-                Cerrar
-              </button>
-            </div>
-
-            <GeneralLoanHistory loans={allLoans} />
-          </div>
-        </div>
       )}
 
       {showTaskHistory && (
