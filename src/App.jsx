@@ -1124,80 +1124,94 @@ export default function App() {
               </div>
             )}
 
-            <h3>Alumnos</h3>
+            <div className="attendance-list-header">
+              <h3>Alumnos</h3>
+              <span>{groupStudents.length} alumnos</span>
+            </div>
 
-            {groupStudents.map(student => {
-              const row = attendanceRows[String(student.ID_ALUMNO)] || {};
-              const estado = row.estado || 'Presente';
+            <div className="attendance-list">
+              {groupStudents.map(student => {
+                const row = attendanceRows[String(student.ID_ALUMNO)] || {};
+                const estado = row.estado || 'Presente';
 
-              return (
-                <div className="student-card" key={student.ID_ALUMNO}>
-                  <strong>{student.Nombre_Completo}</strong>
+                return (
+                  <div className="attendance-row-card" key={student.ID_ALUMNO}>
+                    <div className="attendance-row-main">
+                      <div className="attendance-student-info">
+                        <strong>{student.Nombre_Completo}</strong>
+                        <span>{student.Usuario}</span>
+                      </div>
 
-                  <AttendanceDots
-                    items={buildAttendanceDotsItems(
-                      student.Ultimas_Asistencias || [],
-                      attendanceRows[String(student.ID_ALUMNO)],
-                      attendanceDate
-                    )}
-                  />
-
-                  <span>{student.Usuario}</span>
-                  
-                  <div className="attendance-buttons">
-                    {['Presente', 'Ausente', 'Justificada', 'Tarde'].map(option => (
-                      <button
-                        key={option}
-                        className={`small-btn ${estado === option ? 'active' : ''}`}
-                        onClick={() => setAttendance(student.ID_ALUMNO, option)}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-
-                  {estado === 'Tarde' && (
-                    <>
-                      <label>Hora de llegada</label>
-                      <input
-                        type="time"
-                        value={row.horaLlegada || currentTime()}
-                        onChange={e => setAttendanceLateTime(student.ID_ALUMNO, e.target.value)}
+                      <AttendanceDots
+                        items={buildAttendanceDotsItems(
+                          student.Ultimas_Asistencias || [],
+                          attendanceRows[String(student.ID_ALUMNO)],
+                          attendanceDate
+                        )}
                       />
-                    </>
-                  )}
+                    </div>
 
-                  <div className="student-actions compact-actions">
-                    <button
-                      className={`tiny-btn ${row.comentario ? 'has-comment' : ''}`}
-                      onClick={() => toggleAttendanceComment(String(student.ID_ALUMNO))}
-                    >
-                      {row.comentario ? 'Editar comentario' : 'Comentario'}
-                    </button>
+                    <div className="attendance-row-controls">
+                      <div className="attendance-buttons compact-attendance-buttons">
+                        {[
+                          ['Presente', 'P'],
+                          ['Ausente', 'A'],
+                          ['Justificada', 'J'],
+                          ['Tarde', 'T']
+                        ].map(([option, label]) => (
+                          <button
+                            key={option}
+                            title={option}
+                            className={`small-btn compact-status-btn ${estado === option ? 'active' : ''}`}
+                            onClick={() => setAttendance(student.ID_ALUMNO, option)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
 
-                    <button className="tiny-btn" onClick={() => openStudentProfile(student)}>
-                      Ver ficha
-                    </button>
+                      {estado === 'Tarde' && (
+                        <input
+                          className="late-time-inline"
+                          type="time"
+                          value={row.horaLlegada || currentTime()}
+                          onChange={e => setAttendanceLateTime(student.ID_ALUMNO, e.target.value)}
+                        />
+                      )}
 
-                    <button
-                      className="tiny-btn"
-                      onClick={() => createTaskForInfodeskFromTutor(student)}
-                    >
-                      Tarea Infodesk
-                    </button>
+                      <div className="student-actions compact-actions">
+                        <button
+                          className={`tiny-btn ${row.comentario ? 'has-comment' : ''}`}
+                          onClick={() => toggleAttendanceComment(String(student.ID_ALUMNO))}
+                        >
+                          {row.comentario ? 'Com.' : '+ Com.'}
+                        </button>
+
+                        <button className="tiny-btn" onClick={() => openStudentProfile(student)}>
+                          Ficha
+                        </button>
+
+                        <button
+                          className="tiny-btn"
+                          onClick={() => createTaskForInfodeskFromTutor(student)}
+                        >
+                          Tarea
+                        </button>
+                      </div>
+                    </div>
+
+                    {commentOpenRows[String(student.ID_ALUMNO)] && (
+                      <textarea
+                        className="compact-comment"
+                        placeholder="Comentario del día..."
+                        value={row.comentario || ''}
+                        onChange={e => setAttendanceComment(student.ID_ALUMNO, e.target.value)}
+                      />
+                    )}
                   </div>
-
-                  {commentOpenRows[String(student.ID_ALUMNO)] && (
-                    <textarea
-                      className="compact-comment"
-                      placeholder="Comentario del día..."
-                      value={row.comentario || ''}
-                      onChange={e => setAttendanceComment(student.ID_ALUMNO, e.target.value)}
-                    />
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
             {selectedGroup && groupStudents.length > 0 && (
               <div className="bottom-save-attendance">
