@@ -39,6 +39,7 @@ export default function App() {
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState('Media');
+  const [showTaskHistory, setShowTaskHistory] = useState(false);
 
   const [infodeskSearch, setInfodeskSearch] = useState('');
   const [infodeskStudent, setInfodeskStudent] = useState(null);
@@ -163,6 +164,7 @@ export default function App() {
   async function editInfodeskTask(task) {
     try {
       if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
+      if (!task.ID_TAREA) throw new Error('Esta tarea no tiene ID. Revisá la hoja TAREAS_INFODESK.');
 
       const titulo = prompt('Título de la tarea:', task.Titulo || '') ?? (task.Titulo || '');
       if (!titulo.trim()) return;
@@ -202,6 +204,7 @@ export default function App() {
   async function resolveInfodeskTask(task) {
     try {
       if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
+      if (!task.ID_TAREA) throw new Error('Esta tarea no tiene ID. Revisá la hoja TAREAS_INFODESK.');
 
       const comentarios = prompt('Comentario de resolución:', task.Comentarios || '') ?? (task.Comentarios || '');
 
@@ -779,30 +782,45 @@ export default function App() {
               </button>
 
               <div className="task-list">
-                {infodeskTasks.length === 0 && <p>No hay tareas registradas.</p>}
+                {infodeskTasks
+                  .filter(task =>
+                    task.ID_TAREA &&
+                    String(task.Titulo || task.Descripcion || '').trim() &&
+                    normalizeStatus(task.Estado) !== 'resuelto'
+                  ).length === 0 && <p>No hay tareas pendientes.</p>}
 
-                {infodeskTasks.map(task => (
-                  <div className={`task-card ${String(task.Estado).toLowerCase() === 'resuelto' ? 'resolved' : ''}`} key={task.ID_TAREA}>
-                    <strong>{task.Titulo}</strong>
-                    <span>{task.Descripcion}</span>
-                    <span>Estado: {task.Estado} · Prioridad: {task.Prioridad}</span>
-                    <span>Creada: {task.Fecha_Creacion} · Por: {task.Creado_Por}</span>
-                    {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
-                    {task.Fecha_Resolucion && <span>Resuelta: {task.Fecha_Resolucion} · Por: {task.Resuelto_Por}</span>}
+                {infodeskTasks
+                  .filter(task =>
+                    task.ID_TAREA &&
+                    String(task.Titulo || task.Descripcion || '').trim() &&
+                    normalizeStatus(task.Estado) !== 'resuelto'
+                  )
+                  .map(task => (
+                    <div className="task-card" key={task.ID_TAREA}>
+                      <strong>{task.Titulo}</strong>
+                      {task.Descripcion && <span>{task.Descripcion}</span>}
+                      <span>Estado: {task.Estado} · Prioridad: {task.Prioridad}</span>
+                      <span>Creada: {task.Fecha_Creacion} · Por: {task.Creado_Por}</span>
+                      {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
 
-                    <div className="task-actions">
-                      <button className="btn secondary" onClick={() => editInfodeskTask(task)}>
-                        Editar
-                      </button>
+                      <div className="task-actions">
+                        <button className="btn secondary" onClick={() => editInfodeskTask(task)}>
+                          Editar
+                        </button>
 
-                      {String(task.Estado).toLowerCase() !== 'resuelto' && (
                         <button className="btn success" onClick={() => resolveInfodeskTask(task)}>
                           Marcar resuelto
                         </button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+
+                <button
+                  className="btn secondary"
+                  onClick={() => setShowTaskHistory(true)}
+                >
+                  Ver historial de tareas
+                </button>
               </div>
             </section>
 
@@ -1212,6 +1230,45 @@ export default function App() {
             ))}
           </section>
         </main>
+      )}
+
+      {showTaskHistory && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h2>Historial de tareas de Infodesk</h2>
+              <button className="btn light" onClick={() => setShowTaskHistory(false)}>
+                Cerrar
+              </button>
+            </div>
+
+            <div className="task-list">
+              {infodeskTasks
+                .filter(task =>
+                  task.ID_TAREA &&
+                  String(task.Titulo || task.Descripcion || '').trim() &&
+                  normalizeStatus(task.Estado) === 'resuelto'
+                ).length === 0 && <p>No hay tareas resueltas.</p>}
+
+              {infodeskTasks
+                .filter(task =>
+                  task.ID_TAREA &&
+                  String(task.Titulo || task.Descripcion || '').trim() &&
+                  normalizeStatus(task.Estado) === 'resuelto'
+                )
+                .map(task => (
+                  <div className="task-card resolved" key={task.ID_TAREA}>
+                    <strong>{task.Titulo}</strong>
+                    {task.Descripcion && <span>{task.Descripcion}</span>}
+                    <span>Prioridad: {task.Prioridad}</span>
+                    <span>Creada: {task.Fecha_Creacion} · Por: {task.Creado_Por}</span>
+                    {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
+                    {task.Fecha_Resolucion && <span>Resuelta: {task.Fecha_Resolucion} · Por: {task.Resuelto_Por}</span>}
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
