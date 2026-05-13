@@ -442,38 +442,46 @@ export default function App() {
   }
 }
   function setAttendance(idAlumno, estado) {
+    const key = String(idAlumno);
+
     setAttendanceRows(prev => ({
       ...prev,
-      [idAlumno]: {
-        ...(prev[idAlumno] || {}),
+      [key]: {
+        ...(prev[key] || {}),
         estado,
-        horaLlegada: estado === 'Tarde' ? (prev[idAlumno]?.horaLlegada || currentTime()) : ''
+        horaLlegada: estado === 'Tarde' ? (prev[key]?.horaLlegada || currentTime()) : ''
       }
     }));
   }
 
   function setAttendanceComment(idAlumno, comentario) {
+    const key = String(idAlumno);
+
     setAttendanceRows(prev => ({
       ...prev,
-      [idAlumno]: {
-        ...(prev[idAlumno] || {}),
+      [key]: {
+        ...(prev[key] || {}),
         comentario
       }
     }));
   }
 
   function toggleAttendanceComment(idAlumno) {
+    const key = String(idAlumno);
+
     setCommentOpenRows(prev => ({
       ...prev,
-      [idAlumno]: !prev[idAlumno]
+      [key]: !prev[key]
     }));
   }
 
   function setAttendanceLateTime(idAlumno, horaLlegada) {
+    const key = String(idAlumno);
+
     setAttendanceRows(prev => ({
       ...prev,
-      [idAlumno]: {
-        ...(prev[idAlumno] || {}),
+      [key]: {
+        ...(prev[key] || {}),
         horaLlegada
       }
     }));
@@ -1129,7 +1137,7 @@ export default function App() {
                   <AttendanceDots
                     items={buildAttendanceDotsItems(
                       student.Ultimas_Asistencias || [],
-                      attendanceRows[student.ID_ALUMNO],
+                      attendanceRows[String(student.ID_ALUMNO)],
                       attendanceDate
                     )}
                   />
@@ -1162,7 +1170,7 @@ export default function App() {
                   <div className="student-actions compact-actions">
                     <button
                       className={`tiny-btn ${row.comentario ? 'has-comment' : ''}`}
-                      onClick={() => toggleAttendanceComment(student.ID_ALUMNO)}
+                      onClick={() => toggleAttendanceComment(String(student.ID_ALUMNO))}
                     >
                       {row.comentario ? 'Editar comentario' : 'Comentario'}
                     </button>
@@ -1179,7 +1187,7 @@ export default function App() {
                     </button>
                   </div>
 
-                  {commentOpenRows[student.ID_ALUMNO] && (
+                  {commentOpenRows[String(student.ID_ALUMNO)] && (
                     <textarea
                       className="compact-comment"
                       placeholder="Comentario del día..."
