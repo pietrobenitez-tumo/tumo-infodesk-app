@@ -13,7 +13,10 @@ import {
   saveWorkshopAttendance,
   saveWorkshopFollowUp,
   saveAlertManagement,
-  getAttendanceForDate
+  getAttendanceForDate,
+  getInfodeskTasks,
+  saveInfodeskTask,
+  updateInfodeskTask
 } from './api';
 import './styles.css';
 
@@ -32,6 +35,10 @@ export default function App() {
   const [openLoans, setOpenLoans] = useState([]);
   const [allLoans, setAllLoans] = useState([]);
   const [incidents, setIncidents] = useState([]);
+  const [infodeskTasks, setInfodeskTasks] = useState([]);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
+  const [taskPriority, setTaskPriority] = useState('Media');
 
   const [infodeskSearch, setInfodeskSearch] = useState('');
   const [infodeskStudent, setInfodeskStudent] = useState(null);
@@ -99,6 +106,7 @@ export default function App() {
       setOpenLoans(data.openLoans || []);
       setAllLoans(data.allLoans || []);
       setIncidents(data.incidents || []);
+      setInfodeskTasks(data.tasks || []);
 
       setInfodeskSearch('');
       setInfodeskStudent(null);
@@ -120,7 +128,97 @@ export default function App() {
       setOpenLoans(data.openLoans || []);
       setAllLoans(data.allLoans || []);
       setIncidents(data.incidents || []);
+      setInfodeskTasks(data.tasks || []);
       setStatus('Infodesk actualizado.');
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+
+  async function createInfodeskTask() {
+    try {
+      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
+      if (!taskTitle.trim()) throw new Error('Escribí el título de la tarea.');
+
+      const res = await saveInfodeskTask({
+        titulo: taskTitle,
+        descripcion: taskDescription,
+        prioridad: taskPriority,
+        estado: 'Pendiente',
+        personaInfodesk: selectedInfodesk
+      });
+
+      setStatus(res.message || 'Tarea creada.');
+      setTaskTitle('');
+      setTaskDescription('');
+      setTaskPriority('Media');
+      await refreshInfodesk();
+      await refreshInitialWithoutLoading();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function editInfodeskTask(task) {
+    try {
+      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
+
+      const titulo = prompt('Título de la tarea:', task.Titulo || '') ?? (task.Titulo || '');
+      if (!titulo.trim()) return;
+
+      const descripcion = prompt('Descripción:', task.Descripcion || '') ?? (task.Descripcion || '');
+      const comentarios = prompt('Comentarios:', task.Comentarios || '') ?? (task.Comentarios || '');
+
+      const estado = prompt(
+        'Estado: Pendiente, En proceso o Resuelto',
+        task.Estado || 'Pendiente'
+      ) || task.Estado || 'Pendiente';
+
+      const prioridad = prompt(
+        'Prioridad: Baja, Media, Alta o Urgente',
+        task.Prioridad || 'Media'
+      ) || task.Prioridad || 'Media';
+
+      const res = await updateInfodeskTask({
+        idTarea: task.ID_TAREA,
+        titulo,
+        descripcion,
+        comentarios,
+        estado,
+        prioridad,
+        personaInfodesk: selectedInfodesk,
+        resueltoPor: estado === 'Resuelto' ? selectedInfodesk : ''
+      });
+
+      setStatus(res.message || 'Tarea actualizada.');
+      await refreshInfodesk();
+      await refreshInitialWithoutLoading();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function resolveInfodeskTask(task) {
+    try {
+      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
+
+      const comentarios = prompt('Comentario de resolución:', task.Comentarios || '') ?? (task.Comentarios || '');
+
+      const res = await updateInfodeskTask({
+        idTarea: task.ID_TAREA,
+        titulo: task.Titulo || '',
+        descripcion: task.Descripcion || '',
+        comentarios,
+        estado: 'Resuelto',
+        prioridad: task.Prioridad || 'Media',
+        personaInfodesk: selectedInfodesk,
+        resueltoPor: selectedInfodesk
+      });
+
+      setStatus(res.message || 'Tarea resuelta.');
+      await refreshInfodesk();
+      await refreshInitialWithoutLoading();
     } catch (error) {
       setStatus(error.message);
     }
@@ -650,6 +748,64 @@ export default function App() {
           <section className="card">
             <h2>Infodesk</h2>
             <p><strong>Registrando como:</strong> {selectedInfodesk}</p>
+
+            <section className="subsection">
+              <h3>Tareas de Infodesk</h3>
+
+              <label>Título</label>
+              <input
+                value={taskTitle}
+                onChange={e => setTaskTitle(e.target.value)}
+                placeholder="Ej: Revisar devolución pendiente..."
+              />
+
+              <label>Descripción</label>
+              <textarea
+                value={taskDescription}
+                onChange={e => setTaskDescription(e.target.value)}
+                placeholder="Detalle de la tarea..."
+              />
+
+              <label>Prioridad</label>
+              <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)}>
+                <option>Baja</option>
+                <option>Media</option>
+                <option>Alta</option>
+                <option>Urgente</option>
+              </select>
+
+              <button className="btn success" onClick={createInfodeskTask}>
+                Crear tarea
+              </button>
+
+              <div className="task-list">
+                {infodeskTasks.length === 0 && <p>No hay tareas registradas.</p>}
+
+                {infodeskTasks.map(task => (
+                  <div className={`task-card ${String(task.Estado).toLowerCase() === 'resuelto' ? 'resolved' : ''}`} key={task.ID_TAREA}>
+                    <strong>{task.Titulo}</strong>
+                    <span>{task.Descripcion}</span>
+                    <span>Estado: {task.Estado} · Prioridad: {task.Prioridad}</span>
+                    <span>Creada: {task.Fecha_Creacion} · Por: {task.Creado_Por}</span>
+                    {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
+                    {task.Fecha_Resolucion && <span>Resuelta: {task.Fecha_Resolucion} · Por: {task.Resuelto_Por}</span>}
+
+                    <div className="task-actions">
+                      <button className="btn secondary" onClick={() => editInfodeskTask(task)}>
+                        Editar
+                      </button>
+
+                      {String(task.Estado).toLowerCase() !== 'resuelto' && (
+                        <button className="btn success" onClick={() => resolveInfodeskTask(task)}>
+                          Marcar resuelto
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
 
             <h3>Buscar alumno</h3>
             <input
