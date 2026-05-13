@@ -13,10 +13,7 @@ import {
   saveWorkshopAttendance,
   saveWorkshopFollowUp,
   saveAlertManagement,
-  getAttendanceForDate,
-  getInfodeskTasks,
-  saveInfodeskTask,
-  updateInfodeskTask
+  getAttendanceForDate
 } from './api';
 import './styles.css';
 
@@ -35,10 +32,6 @@ export default function App() {
   const [openLoans, setOpenLoans] = useState([]);
   const [allLoans, setAllLoans] = useState([]);
   const [incidents, setIncidents] = useState([]);
-  const [infodeskTasks, setInfodeskTasks] = useState([]);
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDescription, setTaskDescription] = useState('');
-  const [taskPriority, setTaskPriority] = useState('Media');
 
   const [infodeskSearch, setInfodeskSearch] = useState('');
   const [infodeskStudent, setInfodeskStudent] = useState(null);
@@ -106,7 +99,6 @@ export default function App() {
       setOpenLoans(data.openLoans || []);
       setAllLoans(data.allLoans || []);
       setIncidents(data.incidents || []);
-      setInfodeskTasks(data.tasks || []);
 
       setInfodeskSearch('');
       setInfodeskStudent(null);
@@ -115,9 +107,6 @@ export default function App() {
       setIncidentText('');
       setLoanMaterialId('');
       setLateTime(currentTime());
-      setTaskTitle('');
-      setTaskDescription('');
-      setTaskPriority('Media');
     } catch (error) {
       setStatus(error.message);
     }
@@ -131,7 +120,6 @@ export default function App() {
       setOpenLoans(data.openLoans || []);
       setAllLoans(data.allLoans || []);
       setIncidents(data.incidents || []);
-      setInfodeskTasks(data.tasks || []);
       setStatus('Infodesk actualizado.');
     } catch (error) {
       setStatus(error.message);
@@ -267,99 +255,6 @@ export default function App() {
       setIncidentText('');
       await refreshInfodesk();
       await selectInfodeskStudent(infodeskStudent);
-      await refreshInitialWithoutLoading();
-    } catch (error) {
-      setStatus(error.message);
-    }
-  }
-
-
-  async function refreshInfodeskTasksOnly() {
-    try {
-      const data = await getInfodeskTasks();
-      setInfodeskTasks(data.tasks || []);
-    } catch (error) {
-      setStatus(error.message);
-    }
-  }
-
-  async function createInfodeskTask() {
-    try {
-      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
-      if (!taskTitle.trim()) throw new Error('Escribí un título para la tarea.');
-
-      const res = await saveInfodeskTask({
-        titulo: taskTitle.trim(),
-        descripcion: taskDescription.trim(),
-        prioridad: taskPriority,
-        estado: 'Pendiente',
-        personaInfodesk: selectedInfodesk,
-        creadoPor: selectedInfodesk,
-        comentarios: ''
-      });
-
-      setStatus(res.message || 'Tarea creada.');
-      setTaskTitle('');
-      setTaskDescription('');
-      setTaskPriority('Media');
-      await refreshInfodeskTasksOnly();
-      await refreshInitialWithoutLoading();
-    } catch (error) {
-      setStatus(error.message);
-    }
-  }
-
-  async function editInfodeskTask(task) {
-    try {
-      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
-
-      const titulo = prompt('Título de la tarea:', task.Titulo || '') ?? task.Titulo || '';
-      if (!titulo.trim()) throw new Error('La tarea necesita un título.');
-
-      const descripcion = prompt('Descripción:', task.Descripcion || '') ?? task.Descripcion || '';
-      const comentarios = prompt('Comentarios:', task.Comentarios || '') ?? task.Comentarios || '';
-
-      const res = await updateInfodeskTask({
-        idTarea: task.ID_TAREA,
-        titulo,
-        descripcion,
-        estado: task.Estado || 'Pendiente',
-        prioridad: task.Prioridad || 'Media',
-        comentarios,
-        personaInfodesk: selectedInfodesk
-      });
-
-      setStatus(res.message || 'Tarea actualizada.');
-      await refreshInfodeskTasksOnly();
-      await refreshInitialWithoutLoading();
-    } catch (error) {
-      setStatus(error.message);
-    }
-  }
-
-  async function changeInfodeskTaskStatus(task, estado) {
-    try {
-      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
-
-      let comentarios = task.Comentarios || '';
-      if (estado === 'Resuelto') {
-        const nota = prompt('Comentario de resolución:', comentarios || '') || comentarios || '';
-        comentarios = nota;
-      }
-
-      const res = await updateInfodeskTask({
-        idTarea: task.ID_TAREA,
-        titulo: task.Titulo || '',
-        descripcion: task.Descripcion || '',
-        estado,
-        prioridad: task.Prioridad || 'Media',
-        comentarios,
-        personaInfodesk: selectedInfodesk,
-        resueltoPor: estado === 'Resuelto' ? selectedInfodesk : ''
-      });
-
-      setStatus(res.message || 'Tarea actualizada.');
-      await refreshInfodeskTasksOnly();
       await refreshInitialWithoutLoading();
     } catch (error) {
       setStatus(error.message);
@@ -715,7 +610,7 @@ export default function App() {
           <button className="home-card" onClick={() => setView('selectInfodesk')}>
             <h2>Infodesk</h2>
             <p>Préstamos, devoluciones, materiales, incidencias y llegadas tarde.</p>
-            <strong>{initialData.summary?.openLoans || 0} préstamos abiertos · {initialData.summary?.pendingInfodeskTasks || 0} tareas pendientes</strong>
+            <strong>{initialData.summary?.openLoans || 0} préstamos abiertos</strong>
           </button>
 
           <button className="home-card" onClick={() => setView('selectTutor')}>
@@ -755,19 +650,6 @@ export default function App() {
           <section className="card">
             <h2>Infodesk</h2>
             <p><strong>Registrando como:</strong> {selectedInfodesk}</p>
-
-            <InfodeskTasksPanel
-              tasks={infodeskTasks}
-              taskTitle={taskTitle}
-              taskDescription={taskDescription}
-              taskPriority={taskPriority}
-              setTaskTitle={setTaskTitle}
-              setTaskDescription={setTaskDescription}
-              setTaskPriority={setTaskPriority}
-              onCreate={createInfodeskTask}
-              onEdit={editInfodeskTask}
-              onStatusChange={changeInfodeskTaskStatus}
-            />
 
             <h3>Buscar alumno</h3>
             <input
@@ -1174,96 +1056,6 @@ export default function App() {
             ))}
           </section>
         </main>
-      )}
-    </div>
-  );
-}
-
-
-function InfodeskTasksPanel({
-  tasks,
-  taskTitle,
-  taskDescription,
-  taskPriority,
-  setTaskTitle,
-  setTaskDescription,
-  setTaskPriority,
-  onCreate,
-  onEdit,
-  onStatusChange
-}) {
-  const pendingTasks = (tasks || []).filter(task => normalize(task.Estado) !== 'resuelto');
-  const resolvedTasks = (tasks || []).filter(task => normalize(task.Estado) === 'resuelto');
-
-  return (
-    <div className="task-panel">
-      <h3>Tareas de Infodesk</h3>
-
-      <div className="task-form">
-        <input
-          value={taskTitle}
-          onChange={e => setTaskTitle(e.target.value)}
-          placeholder="Título de la tarea pendiente..."
-        />
-
-        <textarea
-          value={taskDescription}
-          onChange={e => setTaskDescription(e.target.value)}
-          placeholder="Descripción o detalle..."
-        />
-
-        <label>Prioridad</label>
-        <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)}>
-          <option>Baja</option>
-          <option>Media</option>
-          <option>Alta</option>
-          <option>Urgente</option>
-        </select>
-
-        <button className="btn success" onClick={onCreate}>
-          Crear tarea
-        </button>
-      </div>
-
-      <h4>Pendientes</h4>
-      {pendingTasks.length === 0 && <p>No hay tareas pendientes.</p>}
-
-      {pendingTasks.map(task => (
-        <div className="list-item task-item" key={task.ID_TAREA}>
-          <strong>{task.Titulo}</strong>
-          <span>{task.Descripcion}</span>
-          <span>Estado: {task.Estado || 'Pendiente'} · Prioridad: {task.Prioridad || 'Media'}</span>
-          <span>Creada: {task.Fecha_Creacion} · Por: {task.Creado_Por}</span>
-          {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
-
-          <div className="task-actions">
-            <button className="btn secondary" onClick={() => onStatusChange(task, 'En proceso')}>
-              En proceso
-            </button>
-            <button className="btn success" onClick={() => onStatusChange(task, 'Resuelto')}>
-              Resuelto
-            </button>
-            <button className="btn light" onClick={() => onEdit(task)}>
-              Editar / comentar
-            </button>
-          </div>
-        </div>
-      ))}
-
-      {resolvedTasks.length > 0 && (
-        <>
-          <h4>Resueltas recientes</h4>
-          {resolvedTasks.slice(0, 5).map(task => (
-            <div className="list-item task-item resolved" key={task.ID_TAREA}>
-              <strong>{task.Titulo}</strong>
-              <span>Resuelta: {task.Fecha_Resolucion} · Por: {task.Resuelto_Por}</span>
-              {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
-              <button className="btn secondary" onClick={() => onStatusChange(task, 'Pendiente')}>
-                Reabrir
-              </button>
-            </div>
-          ))}
-        </>
       )}
     </div>
   );
