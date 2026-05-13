@@ -555,3 +555,71 @@ textarea {
 .search-item {
   background: #ffffff;
 }
+
+/* =========================
+   LISTA COMPACTA TUTORES
+========================= */
+
+.student-card {
+  padding: 10px;
+  gap: 6px;
+}
+
+.attendance-buttons {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.attendance-buttons .small-btn {
+  padding: 5px 7px;
+  font-size: 11px;
+  border-radius: 7px;
+}
+
+.compact-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.tiny-btn {
+  width: auto;
+  min-width: auto;
+  padding: 5px 8px;
+  font-size: 11px;
+  border-radius: 7px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.tiny-btn:hover {
+  background: #f1f5f9;
+}
+
+.tiny-btn.has-comment {
+  border-color: #f97316;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.compact-comment {
+  min-height: 58px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.bottom-save-attendance {
+  position: sticky;
+  bottom: 12px;
+  margin-top: 16px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
+  z-index: 5;
+}
