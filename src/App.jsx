@@ -1219,6 +1219,7 @@ function buildAttendanceDotsItems(items, currentRow, currentDate) {
     cleanItems.push({
       Fecha: currentDate,
       Estado: currentRow.estado,
+      estado: currentRow.estado,
       Hora_Llegada: currentRow.horaLlegada || '',
       Comentario: currentRow.comentario || ''
     });
@@ -1242,35 +1243,43 @@ function AttendanceDots({ items }) {
           return <span key={index} className="dot empty" title="Sin registro" />;
         }
 
-        const estado = normalizeStatus(item.Estado);
-        const hasComment = Boolean(String(item.Comentario || '').trim());
+        const rawEstado = item.Estado || item.estado || '';
+        const estado = normalizeStatus(rawEstado);
+        const comentario = item.Comentario || item.comentario || '';
+        const hasComment = Boolean(String(comentario).trim());
 
-        let className = 'dot';
+        let className = 'dot empty';
 
-        if (estado === 'ausente') {
-          className += ' absent';
-        } else if (estado === 'justificada') {
-          className += ' justified';
-        } else if (estado === 'tarde') {
-          className += ' late';
-        } else if (estado === 'presente' && hasComment) {
-          className += ' present-comment';
-        } else if (estado === 'presente') {
-          className += ' present';
-        } else {
-          className += ' empty';
+        if (estado.includes('ausente') || estado.includes('falta')) {
+          className = 'dot absent';
+        } else if (estado.includes('justificada') || estado.includes('justificado')) {
+          className = 'dot justified';
+        } else if (estado.includes('tarde')) {
+          className = 'dot late';
+        } else if (estado.includes('presente') && hasComment) {
+          className = 'dot present-comment';
+        } else if (estado.includes('presente')) {
+          className = 'dot present';
         }
 
         return (
           <span
             key={index}
             className={className}
-            title={`${item.Fecha || ''} · ${item.Estado || ''}${hasComment ? ' · con comentario' : ''}`}
+            title={`${item.Fecha || ''} · ${rawEstado || ''}${hasComment ? ' · con comentario' : ''}`}
           />
         );
       })}
     </div>
   );
+}
+
+function normalizeStatus(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 }
 
 function normalizeStatus(value) {
