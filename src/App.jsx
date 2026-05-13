@@ -40,6 +40,7 @@ export default function App() {
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState('Media');
   const [showTaskHistory, setShowTaskHistory] = useState(false);
+  const [showLoanHistory, setShowLoanHistory] = useState(false);
 
   const [infodeskSearch, setInfodeskSearch] = useState('');
   const [infodeskStudent, setInfodeskStudent] = useState(null);
@@ -992,8 +993,12 @@ export default function App() {
               </div>
             ))}
 
-            <h3>Historial general de préstamos</h3>
-            <GeneralLoanHistory loans={allLoans} />
+            <button
+  className="btn secondary"
+  onClick={() => setShowLoanHistory(true)}
+>
+  Ver historial de préstamos
+</button>
           </section>
         </main>
       )}
@@ -1345,6 +1350,21 @@ export default function App() {
         </main>
       )}
 
+      {showLoanHistory && (
+  <div className="modal-backdrop">
+    <div className="modal-card">
+      <div className="modal-header">
+        <h2>Historial general de préstamos</h2>
+        <button className="btn light" onClick={() => setShowLoanHistory(false)}>
+          Cerrar
+        </button>
+      </div>
+
+      <GeneralLoanHistory loans={allLoans} />
+    </div>
+  </div>
+)}
+      
       {showTaskHistory && (
         <div className="modal-backdrop">
           <div className="modal-card">
