@@ -108,3 +108,15 @@ export function saveAlertManagement(data) {
 export function getAttendanceForDate(data) {
   return apiPost('getAttendanceForDate', data);
 }
+
+export function getInfodeskTasks() {
+  return apiPost('getInfodeskTasks');
+}
+
+export function saveInfodeskTask(data) {
+  return apiPost('saveInfodeskTask', data);
+}
+
+export function updateInfodeskTask(data) {
+  return apiPost('updateInfodeskTask', data);
+}
