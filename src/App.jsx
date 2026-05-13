@@ -1221,7 +1221,8 @@ function buildAttendanceDotsItems(items, currentRow, currentDate) {
       Estado: currentRow.estado,
       estado: currentRow.estado,
       Hora_Llegada: currentRow.horaLlegada || '',
-      Comentario: currentRow.comentario || ''
+      Comentario: currentRow.comentario || '',
+      comentario: currentRow.comentario || ''
     });
   }
 
@@ -1274,22 +1275,6 @@ function AttendanceDots({ items }) {
   );
 }
 
-function normalizeStatus(value) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-}
-
-function normalizeStatus(value) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-}
-
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -1303,4 +1288,12 @@ function normalize(value) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
+}
+
+function normalizeStatus(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 }
