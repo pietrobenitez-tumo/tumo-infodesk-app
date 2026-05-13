@@ -623,3 +623,108 @@ textarea {
   box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
   z-index: 5;
 }
+
+/* =========================
+   LISTA RÁPIDA DE ASISTENCIA
+========================= */
+
+.attendance-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+  margin-bottom: 8px;
+}
+
+.attendance-list-header h3 {
+  margin: 0;
+}
+
+.attendance-list-header span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.attendance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attendance-row-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  background: #f8fffb;
+}
+
+.attendance-row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.attendance-student-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.attendance-student-info strong {
+  font-size: 13px;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.attendance-student-info span {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.attendance-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.compact-attendance-buttons {
+  gap: 4px;
+}
+
+.compact-status-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 26px;
+  padding: 0;
+  font-size: 11px;
+  border-radius: 7px;
+}
+
+.late-time-inline {
+  width: 95px;
+  height: 28px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.compact-actions {
+  margin-top: 0;
+}
+
+.compact-actions .tiny-btn {
+  height: 26px;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.attendance-row-card .compact-comment {
+  min-height: 48px;
+  margin-top: 4px;
+  font-size: 12px;
+}
