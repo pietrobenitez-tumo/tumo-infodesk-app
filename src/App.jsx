@@ -84,6 +84,8 @@ export default function App() {
   const [internalTaskTitle, setInternalTaskTitle] = useState('');
   const [internalTaskDescription, setInternalTaskDescription] = useState('');
   const [internalTaskPriority, setInternalTaskPriority] = useState('Media');
+  const [showInternalCommunication, setShowInternalCommunication] = useState(false);
+  const [showInfodeskTaskForm, setShowInfodeskTaskForm] = useState(false);
 
   useEffect(() => {
     loadInitial();
@@ -145,6 +147,8 @@ export default function App() {
       setIncidentText('');
       setLoanMaterialId('');
       setLateTime(currentTime());
+      setShowInternalCommunication(false);
+      setShowInfodeskTaskForm(false);
 
       const internalUser = findInternalUser('Infodesk', ['Infodesk']) || internalUsers.find(user => String(user.ID_USUARIO) === 'INFODESK') || null;
       await loadInternalCommunicationForUser(internalUser);
@@ -186,6 +190,7 @@ export default function App() {
       setTaskTitle('');
       setTaskDescription('');
       setTaskPriority('Media');
+      setShowInfodeskTaskForm(false);
       await refreshInfodesk();
       await refreshInitialWithoutLoading();
     } catch (error) {
@@ -403,6 +408,7 @@ export default function App() {
       setCommentOpenRows({});
       setProfile(null);
       setSelectedStudent(null);
+      setShowInternalCommunication(false);
 
       const data = await getTutorData({
         tutorId: tutor.ID_TUTOR,
@@ -646,6 +652,7 @@ export default function App() {
       setSelectedWorkshop(null);
       setWorkshopRows({});
       setProfile(null);
+      setShowInternalCommunication(false);
       setView('workshop');
 
       const data = await getWorkshopLeaderData({
@@ -795,6 +802,7 @@ export default function App() {
   }
 
   async function openTeamLead(user) {
+    setShowInternalCommunication(false);
     setView('teamLead');
     await loadInternalCommunicationForUser(user, { loadAll: true });
   }
@@ -994,16 +1002,39 @@ export default function App() {
       );
     }
 
-    return (
-      <section className={`subsection internal-communication ${pendingReceivedCount > 0 ? 'has-pending-messages' : ''}`}>
-        <div className="internal-title-row">
-          <h3>Comunicación interna</h3>
+    if (!showInternalCommunication) {
+      return (
+        <button
+          className={`internal-communication-toggle ${pendingReceivedCount > 0 ? 'has-pending-messages' : ''}`}
+          onClick={() => setShowInternalCommunication(true)}
+        >
+          <span>Comunicación interna</span>
 
           {pendingReceivedCount > 0 && (
             <span className="message-badge">
               {pendingReceivedCount}
             </span>
           )}
+        </button>
+      );
+    }
+
+    return (
+      <section className={`subsection internal-communication ${pendingReceivedCount > 0 ? 'has-pending-messages' : ''}`}>
+        <div className="internal-title-row">
+          <h3>Comunicación interna</h3>
+
+          <div className="internal-title-actions">
+            {pendingReceivedCount > 0 && (
+              <span className="message-badge">
+                {pendingReceivedCount}
+              </span>
+            )}
+
+            <button className="tiny-btn" onClick={() => setShowInternalCommunication(false)}>
+              Cerrar
+            </button>
+          </div>
         </div>
 
         <p>
@@ -1325,34 +1356,47 @@ export default function App() {
             <h2>Infodesk</h2>
             <p><strong>Registrando como:</strong> {selectedInfodesk}</p>
 
-            <section className="subsection">
-              <h3>Tareas de Infodesk</h3>
+            <section className="subsection infodesk-tasks-section">
+              <div className="section-title-row">
+                <h3>Tareas de Infodesk</h3>
 
-              <label>Título</label>
-              <input
-                value={taskTitle}
-                onChange={e => setTaskTitle(e.target.value)}
-                placeholder="Ej: Revisar devolución pendiente..."
-              />
+                <button
+                  className="btn secondary"
+                  onClick={() => setShowInfodeskTaskForm(prev => !prev)}
+                >
+                  {showInfodeskTaskForm ? 'Ocultar formulario' : 'Nueva tarea'}
+                </button>
+              </div>
 
-              <label>Descripción</label>
-              <textarea
-                value={taskDescription}
-                onChange={e => setTaskDescription(e.target.value)}
-                placeholder="Detalle de la tarea..."
-              />
+              {showInfodeskTaskForm && (
+                <div className="compact-form-card">
+                  <label>Título</label>
+                  <input
+                    value={taskTitle}
+                    onChange={e => setTaskTitle(e.target.value)}
+                    placeholder="Ej: Revisar devolución pendiente..."
+                  />
 
-              <label>Prioridad</label>
-              <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)}>
-                <option>Baja</option>
-                <option>Media</option>
-                <option>Alta</option>
-                <option>Urgente</option>
-              </select>
+                  <label>Descripción</label>
+                  <textarea
+                    value={taskDescription}
+                    onChange={e => setTaskDescription(e.target.value)}
+                    placeholder="Detalle de la tarea..."
+                  />
 
-              <button className="btn success" onClick={createInfodeskTask}>
-                Crear tarea
-              </button>
+                  <label>Prioridad</label>
+                  <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)}>
+                    <option>Baja</option>
+                    <option>Media</option>
+                    <option>Alta</option>
+                    <option>Urgente</option>
+                  </select>
+
+                  <button className="btn success" onClick={createInfodeskTask}>
+                    Guardar tarea
+                  </button>
+                </div>
+              )}
 
               <div className="task-list">
                 {infodeskTasks
@@ -1420,94 +1464,98 @@ export default function App() {
               </div>
             )}
 
-            {infodeskStudent && (
-              <>
-                <h3>Acciones rápidas</h3>
-
-                <label>Hora de llegada tarde</label>
-                <input
-                  type="time"
-                  value={lateTime}
-                  onChange={e => setLateTime(e.target.value)}
-                />
-
-                <button className="btn success" onClick={registerLateArrival}>
-                  Registrar llegada tarde
-                </button>
-
-                <label>Comentario</label>
-                <textarea
-                  placeholder="Comentario desde Infodesk..."
-                  value={commentText}
-                  onChange={e => setCommentText(e.target.value)}
-                />
-                <button className="btn secondary" onClick={saveInfodeskComment}>
-                  Guardar comentario
-                </button>
-
-                <label>Incidencia</label>
-                <textarea
-                  placeholder="Describir incidencia..."
-                  value={incidentText}
-                  onChange={e => setIncidentText(e.target.value)}
-                />
-                <button className="btn secondary" onClick={createNewIncident}>
-                  Guardar incidencia
-                </button>
-
-                <h3>Préstamo de material</h3>
-                <label>Material disponible</label>
-                <select value={loanMaterialId} onChange={e => setLoanMaterialId(e.target.value)}>
-                  <option value="">Seleccionar material</option>
-                  {materials
-                    .filter(m => String(m.Estado || '').toLowerCase() !== 'prestado')
-                    .map(m => (
-                      <option key={m.ID_MATERIAL} value={m.ID_MATERIAL}>
-                        {m.Tipo} · {m.Codigo} · {m.Estado}
-                      </option>
-                    ))}
-                </select>
-
-                <button className="btn success" onClick={createNewLoan}>
-                  Registrar préstamo
-                </button>
-              </>
-            )}
           </section>
 
           <section className="right-column-stack">
             {renderInternalCommunicationPanel()}
 
-            <section className="card">
-              <h2>Perfil del alumno</h2>
-
-            {!infodeskProfile && <p>Buscá y seleccioná un alumno.</p>}
-
-            {infodeskProfile && (
-              <InfodeskStudentProfile profile={infodeskProfile} />
-            )}
-
-            <h3>Préstamos abiertos</h3>
-            {openLoans.map(loan => (
-              <div className="list-item" key={loan.ID_PRESTAMO}>
-                <strong>{loan.Alumno}</strong>
-                <span>{loan.Material} · {loan.Fecha_Prestamo}</span>
-                <span>{loan.Grupo_App}</span>
-                <button className="btn success" onClick={() => closeLoan(loan)}>
-                  Devolver
-                </button>
-                <button className="btn danger" onClick={() => closeLoan(loan, 'Dañado', 'Dañado')}>
-                  Marcar dañado
+            <section className="card infodesk-open-loans-card">
+              <div className="section-title-row">
+                <h2>Préstamos abiertos</h2>
+                <button className="btn secondary" onClick={() => setShowLoanHistory(true)}>
+                  Ver historial
                 </button>
               </div>
-            ))}
 
-            <button
-  className="btn secondary"
-  onClick={() => setShowLoanHistory(true)}
->
-  Ver historial de préstamos
-</button>
+              {openLoans.length === 0 && <p>No hay préstamos abiertos.</p>}
+
+              {openLoans.map(loan => (
+                <div className="list-item" key={loan.ID_PRESTAMO}>
+                  <strong>{loan.Alumno}</strong>
+                  <span>{loan.Material} · {loan.Fecha_Prestamo}</span>
+                  <span>{loan.Grupo_App}</span>
+                  <button className="btn success" onClick={() => closeLoan(loan)}>
+                    Devolver
+                  </button>
+                  <button className="btn danger" onClick={() => closeLoan(loan, 'Dañado', 'Dañado')}>
+                    Marcar dañado
+                  </button>
+                </div>
+              ))}
+            </section>
+
+            <section className="card infodesk-profile-card">
+              <h2>Perfil del alumno</h2>
+
+              {!infodeskProfile && <p>Buscá y seleccioná un alumno.</p>}
+
+              {infodeskProfile && (
+                <InfodeskStudentProfile profile={infodeskProfile} />
+              )}
+
+              {infodeskProfile && infodeskStudent && (
+                <section className="profile-actions-card">
+                  <h3>Acciones rápidas</h3>
+
+                  <label>Hora de llegada tarde</label>
+                  <input
+                    type="time"
+                    value={lateTime}
+                    onChange={e => setLateTime(e.target.value)}
+                  />
+
+                  <button className="btn success" onClick={registerLateArrival}>
+                    Registrar llegada tarde
+                  </button>
+
+                  <label>Comentario</label>
+                  <textarea
+                    placeholder="Comentario desde Infodesk..."
+                    value={commentText}
+                    onChange={e => setCommentText(e.target.value)}
+                  />
+                  <button className="btn secondary" onClick={saveInfodeskComment}>
+                    Guardar comentario
+                  </button>
+
+                  <label>Incidencia</label>
+                  <textarea
+                    placeholder="Describir incidencia..."
+                    value={incidentText}
+                    onChange={e => setIncidentText(e.target.value)}
+                  />
+                  <button className="btn secondary" onClick={createNewIncident}>
+                    Guardar incidencia
+                  </button>
+
+                  <h3>Préstamo de material</h3>
+                  <label>Material disponible</label>
+                  <select value={loanMaterialId} onChange={e => setLoanMaterialId(e.target.value)}>
+                    <option value="">Seleccionar material</option>
+                    {materials
+                      .filter(m => String(m.Estado || '').toLowerCase() !== 'prestado')
+                      .map(m => (
+                        <option key={m.ID_MATERIAL} value={m.ID_MATERIAL}>
+                          {m.Tipo} · {m.Codigo} · {m.Estado}
+                        </option>
+                      ))}
+                  </select>
+
+                  <button className="btn success" onClick={createNewLoan}>
+                    Registrar préstamo
+                  </button>
+                </section>
+              )}
             </section>
           </section>
         </main>
