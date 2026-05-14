@@ -1073,3 +1073,88 @@ textarea {
   background: #ef4444 !important;
   color: #ffffff !important;
 }
+
+/* =========================
+   RESTAURAR COLORES BOTONES ASISTENCIA
+   Mantener este bloque al final del archivo
+========================= */
+
+.attendance-buttons .compact-status-btn,
+.compact-attendance-buttons .compact-status-btn {
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  opacity: 0.75 !important;
+  font-weight: 700 !important;
+}
+
+/* Presente */
+.attendance-buttons .compact-status-btn.status-presente,
+.compact-attendance-buttons .compact-status-btn.status-presente {
+  border-color: #86efac !important;
+  color: #166534 !important;
+}
+
+.attendance-buttons .compact-status-btn.status-presente.active,
+.compact-attendance-buttons .compact-status-btn.status-presente.active {
+  background: #dcfce7 !important;
+  border-color: #22c55e !important;
+  color: #166534 !important;
+  opacity: 1 !important;
+  font-weight: 800 !important;
+}
+
+/* Ausente */
+.attendance-buttons .compact-status-btn.status-ausente,
+.compact-attendance-buttons .compact-status-btn.status-ausente {
+  border-color: #fecaca !important;
+  color: #991b1b !important;
+}
+
+.attendance-buttons .compact-status-btn.status-ausente.active,
+.compact-attendance-buttons .compact-status-btn.status-ausente.active {
+  background: #fee2e2 !important;
+  border-color: #ef4444 !important;
+  color: #991b1b !important;
+  opacity: 1 !important;
+  font-weight: 800 !important;
+}
+
+/* Justificada */
+.attendance-buttons .compact-status-btn.status-justificada,
+.compact-attendance-buttons .compact-status-btn.status-justificada {
+  border-color: #bae6fd !important;
+  color: #075985 !important;
+}
+
+.attendance-buttons .compact-status-btn.status-justificada.active,
+.compact-attendance-buttons .compact-status-btn.status-justificada.active {
+  background: #e0f2fe !important;
+  border-color: #38bdf8 !important;
+  color: #075985 !important;
+  opacity: 1 !important;
+  font-weight: 800 !important;
+}
+
+/* Tarde */
+.attendance-buttons .compact-status-btn.status-tarde,
+.compact-attendance-buttons .compact-status-btn.status-tarde {
+  border-color: #fed7aa !important;
+  color: #9a3412 !important;
+}
+
+.attendance-buttons .compact-status-btn.status-tarde.active,
+.compact-attendance-buttons .compact-status-btn.status-tarde.active {
+  background: #ffedd5 !important;
+  border-color: #f97316 !important;
+  color: #9a3412 !important;
+  opacity: 1 !important;
+  font-weight: 800 !important;
+}
+
+/* Botón activo */
+.attendance-buttons .compact-status-btn.active,
+.compact-attendance-buttons .compact-status-btn.active {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
