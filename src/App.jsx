@@ -145,6 +145,9 @@ export default function App() {
       setIncidentText('');
       setLoanMaterialId('');
       setLateTime(currentTime());
+
+      const internalUser = findInternalUser(personName, ['Infodesk']);
+      await loadInternalCommunicationForUser(internalUser);
     } catch (error) {
       setStatus(error.message);
     }
@@ -408,6 +411,9 @@ export default function App() {
 
       setTutorStudents(data.students || []);
       setTutorGroups(data.groups || []);
+
+      const internalUser = findInternalUser(tutor.Nombre, ['Tutor']);
+      await loadInternalCommunicationForUser(internalUser);
     } catch (error) {
       setStatus(error.message);
     }
@@ -648,6 +654,9 @@ export default function App() {
       });
 
       setWorkshops(data.workshops || []);
+
+      const internalUser = findInternalUser(leader.Nombre, ['Líder de taller']);
+      await loadInternalCommunicationForUser(internalUser);
     } catch (error) {
       setStatus(error.message);
     }
@@ -710,14 +719,33 @@ export default function App() {
   }
 
 
-  async function openInternalCommunication(user) {
-    try {
-      setSelectedInternalUser(user);
-      setView('internalCommunication');
+  function findInternalUser(nombre, roles = []) {
+    const targetName = normalize(nombre);
+    const normalizedRoles = roles.map(role => normalize(role));
 
-      const data = await getInternalCommunicationData({
-        userId: user.ID_USUARIO
-      });
+    return internalUsers.find(user => {
+      const sameName = normalize(user.Nombre) === targetName;
+      const roleText = normalize(user.Rol);
+      const sameRole = normalizedRoles.length === 0 || normalizedRoles.some(role => roleText === role || roleText.includes(role));
+
+      return sameName && sameRole;
+    }) || null;
+  }
+
+  async function loadInternalCommunicationForUser(user, options = {}) {
+    try {
+      if (!user) {
+        setSelectedInternalUser(null);
+        setInternalMessages([]);
+        setInternalTasks([]);
+        return;
+      }
+
+      setSelectedInternalUser(user);
+
+      const data = await getInternalCommunicationData(
+        options.loadAll ? {} : { userId: user.ID_USUARIO }
+      );
 
       setInternalUsers(data.users || []);
       setInternalMessages(data.messages || []);
@@ -730,7 +758,8 @@ export default function App() {
       setInternalTaskTitle('');
       setInternalTaskDescription('');
       setInternalTaskPriority('Media');
-      setStatus('');
+
+      if (!options.keepStatus) setStatus('');
     } catch (error) {
       setStatus(error.message);
     }
@@ -740,9 +769,11 @@ export default function App() {
     try {
       if (!user) return;
 
-      const data = await getInternalCommunicationData({
-        userId: user.ID_USUARIO
-      });
+      const isTeamLeadView = view === 'teamLead';
+
+      const data = await getInternalCommunicationData(
+        isTeamLeadView ? {} : { userId: user.ID_USUARIO }
+      );
 
       setInternalUsers(data.users || []);
       setInternalMessages(data.messages || []);
@@ -750,6 +781,11 @@ export default function App() {
     } catch (error) {
       setStatus(error.message);
     }
+  }
+
+  async function openTeamLead(user) {
+    setView('teamLead');
+    await loadInternalCommunicationForUser(user, { loadAll: true });
   }
 
   async function createInternalMessage() {
@@ -902,6 +938,218 @@ export default function App() {
     }
   }
 
+
+  function renderInternalCommunicationPanel({ showAll = false } = {}) {
+    const currentUserId = String(selectedInternalUser?.ID_USUARIO || '');
+
+    const receivedMessages = internalMessages.filter(message => {
+      const visible = normalizeStatus(message.Estado) !== 'archivado';
+      if (!visible) return false;
+      return showAll || String(message.Destino_ID) === currentUserId;
+    });
+
+    const sentMessages = internalMessages.filter(message => {
+      return showAll || String(message.Origen_ID) === currentUserId;
+    });
+
+    const receivedTasks = internalTasks.filter(task => {
+      const pending = normalizeStatus(task.Estado) !== 'resuelto';
+      if (!pending) return false;
+      return showAll || String(task.Destino_ID) === currentUserId;
+    });
+
+    const sentTasks = internalTasks.filter(task => {
+      return showAll || String(task.Creado_Por_ID) === currentUserId;
+    });
+
+    if (!selectedInternalUser) {
+      return (
+        <section className="subsection">
+          <h3>Comunicación interna</h3>
+          <p>No se encontró este perfil en USUARIOS_INTERNOS.</p>
+        </section>
+      );
+    }
+
+    return (
+      <section className="subsection internal-communication">
+        <h3>Comunicación interna</h3>
+        <p>
+          <strong>Perfil:</strong> {selectedInternalUser.Nombre} · {selectedInternalUser.Rol}
+        </p>
+
+        <details open>
+          <summary>Enviar mensaje</summary>
+
+          <label>Destinatario</label>
+          <select value={messageDestinationId} onChange={e => setMessageDestinationId(e.target.value)}>
+            <option value="">Seleccionar destinatario</option>
+            {internalUsers
+              .filter(user => String(user.ID_USUARIO) !== currentUserId)
+              .map(user => (
+                <option key={user.ID_USUARIO} value={user.ID_USUARIO}>
+                  {user.Nombre} · {user.Rol}
+                </option>
+              ))}
+          </select>
+
+          <label>Asunto</label>
+          <input
+            value={messageSubject}
+            onChange={e => setMessageSubject(e.target.value)}
+            placeholder="Asunto del mensaje..."
+          />
+
+          <label>Mensaje</label>
+          <textarea
+            value={messageBody}
+            onChange={e => setMessageBody(e.target.value)}
+            placeholder="Escribí el mensaje..."
+          />
+
+          <button className="btn success" onClick={createInternalMessage}>
+            Enviar mensaje
+          </button>
+        </details>
+
+        <details>
+          <summary>Crear tarea</summary>
+
+          <label>Destinatario</label>
+          <select value={taskDestinationId} onChange={e => setTaskDestinationId(e.target.value)}>
+            <option value="">Seleccionar destinatario</option>
+            {internalUsers
+              .filter(user => String(user.ID_USUARIO) !== currentUserId)
+              .map(user => (
+                <option key={user.ID_USUARIO} value={user.ID_USUARIO}>
+                  {user.Nombre} · {user.Rol}
+                </option>
+              ))}
+          </select>
+
+          <label>Título</label>
+          <input
+            value={internalTaskTitle}
+            onChange={e => setInternalTaskTitle(e.target.value)}
+            placeholder="Título de la tarea..."
+          />
+
+          <label>Descripción</label>
+          <textarea
+            value={internalTaskDescription}
+            onChange={e => setInternalTaskDescription(e.target.value)}
+            placeholder="Detalle de la tarea..."
+          />
+
+          <label>Prioridad</label>
+          <select value={internalTaskPriority} onChange={e => setInternalTaskPriority(e.target.value)}>
+            <option>Baja</option>
+            <option>Media</option>
+            <option>Alta</option>
+            <option>Urgente</option>
+          </select>
+
+          <button className="btn success" onClick={createInternalTask}>
+            Crear tarea
+          </button>
+        </details>
+
+        <details open>
+          <summary>{showAll ? 'Mensajes recibidos del equipo' : 'Mensajes recibidos'}</summary>
+
+          {receivedMessages.length === 0 && <p>No hay mensajes recibidos.</p>}
+
+          {receivedMessages.map(message => (
+            <div className="list-item" key={message.ID_MENSAJE}>
+              <strong>{message.Asunto || 'Sin asunto'}</strong>
+              <span>De: {message.Origen_Nombre} · {message.Origen_Rol}</span>
+              {showAll && <span>Para: {message.Destino_Nombre} · {message.Destino_Rol}</span>}
+              <span>{message.Mensaje}</span>
+              <span>Estado: {message.Estado || 'Pendiente'} · {message.Fecha}</span>
+              {message.Respuesta && <span>Respuesta: {message.Respuesta}</span>}
+
+              <div className="task-actions">
+                <button className="btn secondary" onClick={() => respondInternalMessage(message)}>
+                  Responder
+                </button>
+                <button className="btn light" onClick={() => archiveInternalMessage(message)}>
+                  Archivar
+                </button>
+              </div>
+            </div>
+          ))}
+        </details>
+
+        <details open>
+          <summary>{showAll ? 'Tareas pendientes del equipo' : 'Tareas recibidas'}</summary>
+
+          {receivedTasks.length === 0 && <p>No hay tareas pendientes.</p>}
+
+          {receivedTasks.map(task => (
+            <div className="task-card" key={task.ID_TAREA}>
+              <strong>{task.Titulo}</strong>
+              {task.Descripcion && <span>{task.Descripcion}</span>}
+              <span>De: {task.Creado_Por_Nombre} · {task.Creado_Por_Rol}</span>
+              {showAll && <span>Para: {task.Destino_Nombre} · {task.Destino_Rol}</span>}
+              <span>Estado: {task.Estado} · Prioridad: {task.Prioridad}</span>
+              {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
+
+              <div className="task-actions">
+                <button className="btn secondary" onClick={() => editInternalTask(task)}>
+                  Editar
+                </button>
+                <button className="btn success" onClick={() => resolveInternalTask(task)}>
+                  Marcar resuelta
+                </button>
+              </div>
+            </div>
+          ))}
+        </details>
+
+        <details>
+          <summary>{showAll ? 'Mensajes enviados del equipo' : 'Mensajes enviados'}</summary>
+
+          {sentMessages.length === 0 && <p>No hay mensajes enviados.</p>}
+
+          {sentMessages.slice(0, 20).map(message => (
+            <div className="list-item" key={message.ID_MENSAJE}>
+              <strong>{message.Asunto || 'Sin asunto'}</strong>
+              <span>De: {message.Origen_Nombre} · {message.Origen_Rol}</span>
+              <span>Para: {message.Destino_Nombre} · {message.Destino_Rol}</span>
+              <span>{message.Mensaje}</span>
+              <span>Estado: {message.Estado || 'Pendiente'} · {message.Fecha}</span>
+              {message.Respuesta && <span>Respuesta: {message.Respuesta}</span>}
+            </div>
+          ))}
+        </details>
+
+        <details>
+          <summary>{showAll ? 'Tareas enviadas del equipo' : 'Tareas enviadas'}</summary>
+
+          {sentTasks.length === 0 && <p>No hay tareas enviadas.</p>}
+
+          {sentTasks.slice(0, 20).map(task => (
+            <div className={`task-card ${normalizeStatus(task.Estado) === 'resuelto' ? 'resolved' : ''}`} key={task.ID_TAREA}>
+              <strong>{task.Titulo}</strong>
+              {task.Descripcion && <span>{task.Descripcion}</span>}
+              <span>De: {task.Creado_Por_Nombre} · {task.Creado_Por_Rol}</span>
+              <span>Para: {task.Destino_Nombre} · {task.Destino_Rol}</span>
+              <span>Estado: {task.Estado} · Prioridad: {task.Prioridad}</span>
+              {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
+              {task.Fecha_Resolucion && <span>Resuelta: {task.Fecha_Resolucion} · Por: {task.Resuelto_Por}</span>}
+
+              <div className="task-actions">
+                <button className="btn secondary" onClick={() => editInternalTask(task)}>
+                  Editar
+                </button>
+              </div>
+            </div>
+          ))}
+        </details>
+      </section>
+    );
+  }
+
   const groupStudents = useMemo(() => {
     return tutorStudents.filter(s => s.Grupo_App === selectedGroup);
   }, [tutorStudents, selectedGroup]);
@@ -973,7 +1221,7 @@ export default function App() {
       <header className="header">
         <div>
           <h1>TUMO · Gestión interna</h1>
-          <p>Infodesk, tutores y líderes de taller.</p>
+          <p>Infodesk, tutores, talleristas y Team Lead.</p>
         </div>
 
         {view !== 'home' && (
@@ -1000,36 +1248,16 @@ export default function App() {
           </button>
 
           <button className="home-card" onClick={() => setView('selectWorkshopLeader')}>
-            <h2>Líderes de taller</h2>
+            <h2>Talleristas</h2>
             <p>Asistencia, participación y seguimiento de talleres.</p>
             <strong>{initialData.summary?.workshopLeaders || 0} líderes</strong>
           </button>
 
-          <button className="home-card" onClick={() => setView('selectInternalUser')}>
-            <h2>Comunicación interna</h2>
-            <p>Mensajes y tareas entre Infodesk, tutores, líderes de taller y Team Lead.</p>
+          <button className="home-card" onClick={() => setView('selectTeamLead')}>
+            <h2>Team Lead</h2>
+            <p>Mensajes, tareas y seguimiento interno del equipo.</p>
             <strong>{initialData.summary?.pendingInternalMessages || 0} mensajes pendientes</strong>
           </button>
-        </main>
-      )}
-
-      {view === 'selectInternalUser' && (
-        <main className="card">
-          <h2>Comunicación interna</h2>
-          <p>Seleccioná quién sos para ver tus mensajes y tareas.</p>
-
-          <div className="tutor-grid">
-            {internalUsers.map(user => (
-              <button
-                className="tutor-card"
-                key={user.ID_USUARIO}
-                onClick={() => openInternalCommunication(user)}
-              >
-                <strong>{user.Nombre}</strong>
-                <span>{user.Rol}</span>
-              </button>
-            ))}
-          </div>
         </main>
       )}
 
@@ -1056,6 +1284,8 @@ export default function App() {
           <section className="card">
             <h2>Infodesk</h2>
             <p><strong>Registrando como:</strong> {selectedInfodesk}</p>
+
+            {renderInternalCommunicationPanel()}
 
             <section className="subsection">
               <h3>Tareas de Infodesk</h3>
@@ -1266,6 +1496,8 @@ export default function App() {
   Enviar tarea a Infodesk
 </button>
 
+            {renderInternalCommunicationPanel()}
+
             {tutorAlerts.length > 0 && (
               <>
                 <h3>Alertas del tutor</h3>
@@ -1470,210 +1702,48 @@ export default function App() {
       )}
 
 
-      {view === 'internalCommunication' && (
+
+      {view === 'selectTeamLead' && (
+        <main className="card">
+          <h2>Seleccionar Team Lead</h2>
+
+          <div className="tutor-grid">
+            {internalUsers
+              .filter(user => normalizeStatus(user.Rol) === 'team lead')
+              .map(user => (
+                <button
+                  className="tutor-card"
+                  key={user.ID_USUARIO}
+                  onClick={() => openTeamLead(user)}
+                >
+                  <strong>{user.Nombre}</strong>
+                  <span>{user.Rol}</span>
+                </button>
+              ))}
+          </div>
+        </main>
+      )}
+
+      {view === 'teamLead' && (
         <main className="grid-main">
           <section className="card">
-            <h2>Comunicación interna</h2>
-
-            {selectedInternalUser && (
-              <p>
-                <strong>Ingresaste como:</strong> {selectedInternalUser.Nombre} · {selectedInternalUser.Rol}
-              </p>
-            )}
-
-            <section className="subsection">
-              <h3>Enviar mensaje</h3>
-
-              <label>Destinatario</label>
-              <select value={messageDestinationId} onChange={e => setMessageDestinationId(e.target.value)}>
-                <option value="">Seleccionar destinatario</option>
-                {internalUsers
-                  .filter(user => String(user.ID_USUARIO) !== String(selectedInternalUser?.ID_USUARIO))
-                  .map(user => (
-                    <option key={user.ID_USUARIO} value={user.ID_USUARIO}>
-                      {user.Nombre} · {user.Rol}
-                    </option>
-                  ))}
-              </select>
-
-              <label>Asunto</label>
-              <input
-                value={messageSubject}
-                onChange={e => setMessageSubject(e.target.value)}
-                placeholder="Asunto del mensaje..."
-              />
-
-              <label>Mensaje</label>
-              <textarea
-                value={messageBody}
-                onChange={e => setMessageBody(e.target.value)}
-                placeholder="Escribí el mensaje..."
-              />
-
-              <button className="btn success" onClick={createInternalMessage}>
-                Enviar mensaje
-              </button>
-            </section>
-
-            <section className="subsection">
-              <h3>Crear tarea</h3>
-
-              <label>Destinatario</label>
-              <select value={taskDestinationId} onChange={e => setTaskDestinationId(e.target.value)}>
-                <option value="">Seleccionar destinatario</option>
-                {internalUsers
-                  .filter(user => String(user.ID_USUARIO) !== String(selectedInternalUser?.ID_USUARIO))
-                  .map(user => (
-                    <option key={user.ID_USUARIO} value={user.ID_USUARIO}>
-                      {user.Nombre} · {user.Rol}
-                    </option>
-                  ))}
-              </select>
-
-              <label>Título</label>
-              <input
-                value={internalTaskTitle}
-                onChange={e => setInternalTaskTitle(e.target.value)}
-                placeholder="Título de la tarea..."
-              />
-
-              <label>Descripción</label>
-              <textarea
-                value={internalTaskDescription}
-                onChange={e => setInternalTaskDescription(e.target.value)}
-                placeholder="Detalle de la tarea..."
-              />
-
-              <label>Prioridad</label>
-              <select value={internalTaskPriority} onChange={e => setInternalTaskPriority(e.target.value)}>
-                <option>Baja</option>
-                <option>Media</option>
-                <option>Alta</option>
-                <option>Urgente</option>
-              </select>
-
-              <button className="btn success" onClick={createInternalTask}>
-                Crear tarea
-              </button>
-            </section>
+            <h2>Team Lead</h2>
+            <p>Panel general de comunicación interna y tareas del equipo.</p>
+            {renderInternalCommunicationPanel({ showAll: true })}
           </section>
 
           <section className="card">
-            <h2>Mis pendientes</h2>
-
-            <h3>Mensajes recibidos</h3>
-            {internalMessages.filter(message =>
-              String(message.Destino_ID) === String(selectedInternalUser?.ID_USUARIO) &&
-              normalizeStatus(message.Estado) !== 'archivado'
-            ).length === 0 && <p>No tenés mensajes recibidos.</p>}
-
-            {internalMessages
-              .filter(message =>
-                String(message.Destino_ID) === String(selectedInternalUser?.ID_USUARIO) &&
-                normalizeStatus(message.Estado) !== 'archivado'
-              )
-              .map(message => (
-                <div className="list-item" key={message.ID_MENSAJE}>
-                  <strong>{message.Asunto || 'Sin asunto'}</strong>
-                  <span>De: {message.Origen_Nombre} · {message.Origen_Rol}</span>
-                  <span>{message.Mensaje}</span>
-                  <span>Estado: {message.Estado || 'Pendiente'} · {message.Fecha}</span>
-                  {message.Respuesta && <span>Respuesta: {message.Respuesta}</span>}
-
-                  <div className="task-actions">
-                    <button className="btn secondary" onClick={() => respondInternalMessage(message)}>
-                      Responder
-                    </button>
-                    <button className="btn light" onClick={() => archiveInternalMessage(message)}>
-                      Archivar
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-            <h3>Tareas recibidas</h3>
-            {internalTasks.filter(task =>
-              String(task.Destino_ID) === String(selectedInternalUser?.ID_USUARIO) &&
-              normalizeStatus(task.Estado) !== 'resuelto'
-            ).length === 0 && <p>No tenés tareas pendientes.</p>}
-
-            {internalTasks
-              .filter(task =>
-                String(task.Destino_ID) === String(selectedInternalUser?.ID_USUARIO) &&
-                normalizeStatus(task.Estado) !== 'resuelto'
-              )
-              .map(task => (
-                <div className="task-card" key={task.ID_TAREA}>
-                  <strong>{task.Titulo}</strong>
-                  {task.Descripcion && <span>{task.Descripcion}</span>}
-                  <span>De: {task.Creado_Por_Nombre} · {task.Creado_Por_Rol}</span>
-                  <span>Estado: {task.Estado} · Prioridad: {task.Prioridad}</span>
-                  {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
-
-                  <div className="task-actions">
-                    <button className="btn secondary" onClick={() => editInternalTask(task)}>
-                      Editar
-                    </button>
-                    <button className="btn success" onClick={() => resolveInternalTask(task)}>
-                      Marcar resuelta
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-            <h3>Mensajes enviados</h3>
-            {internalMessages.filter(message =>
-              String(message.Origen_ID) === String(selectedInternalUser?.ID_USUARIO)
-            ).length === 0 && <p>No enviaste mensajes.</p>}
-
-            {internalMessages
-              .filter(message =>
-                String(message.Origen_ID) === String(selectedInternalUser?.ID_USUARIO)
-              )
-              .slice(0, 10)
-              .map(message => (
-                <div className="list-item" key={message.ID_MENSAJE}>
-                  <strong>{message.Asunto || 'Sin asunto'}</strong>
-                  <span>Para: {message.Destino_Nombre} · {message.Destino_Rol}</span>
-                  <span>{message.Mensaje}</span>
-                  <span>Estado: {message.Estado || 'Pendiente'} · {message.Fecha}</span>
-                  {message.Respuesta && <span>Respuesta: {message.Respuesta}</span>}
-                </div>
-              ))}
-
-            <h3>Tareas enviadas</h3>
-            {internalTasks.filter(task =>
-              String(task.Creado_Por_ID) === String(selectedInternalUser?.ID_USUARIO)
-            ).length === 0 && <p>No creaste tareas.</p>}
-
-            {internalTasks
-              .filter(task =>
-                String(task.Creado_Por_ID) === String(selectedInternalUser?.ID_USUARIO)
-              )
-              .slice(0, 10)
-              .map(task => (
-                <div className={`task-card ${normalizeStatus(task.Estado) === 'resuelto' ? 'resolved' : ''}`} key={task.ID_TAREA}>
-                  <strong>{task.Titulo}</strong>
-                  {task.Descripcion && <span>{task.Descripcion}</span>}
-                  <span>Para: {task.Destino_Nombre} · {task.Destino_Rol}</span>
-                  <span>Estado: {task.Estado} · Prioridad: {task.Prioridad}</span>
-                  {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
-                  {task.Fecha_Resolucion && <span>Resuelta: {task.Fecha_Resolucion} · Por: {task.Resuelto_Por}</span>}
-
-                  <div className="task-actions">
-                    <button className="btn secondary" onClick={() => editInternalTask(task)}>
-                      Editar
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <h2>Resumen</h2>
+            <p><strong>Usuarios internos:</strong> {internalUsers.length}</p>
+            <p><strong>Mensajes cargados:</strong> {internalMessages.length}</p>
+            <p><strong>Tareas cargadas:</strong> {internalTasks.length}</p>
           </section>
         </main>
       )}
 
       {view === 'selectWorkshopLeader' && (
         <main className="card">
-          <h2>Seleccionar líder de taller</h2>
+          <h2>Seleccionar tallerista</h2>
 
           <div className="tutor-grid">
             {(initialData.workshopLeaders || []).map(leader => (
@@ -1689,6 +1759,8 @@ export default function App() {
         <main className="grid-main">
           <section className="card">
             <h2>{selectedLeader?.Nombre}</h2>
+
+            {renderInternalCommunicationPanel()}
 
             <label>Taller</label>
             <select
