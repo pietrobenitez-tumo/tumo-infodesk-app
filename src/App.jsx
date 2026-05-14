@@ -146,7 +146,7 @@ export default function App() {
       setLoanMaterialId('');
       setLateTime(currentTime());
 
-      const internalUser = findInternalUser(personName, ['Infodesk']);
+      const internalUser = findInternalUser('Infodesk', ['Infodesk']) || internalUsers.find(user => String(user.ID_USUARIO) === 'INFODESK') || null;
       await loadInternalCommunicationForUser(internalUser);
     } catch (error) {
       setStatus(error.message);
@@ -655,7 +655,7 @@ export default function App() {
 
       setWorkshops(data.workshops || []);
 
-      const internalUser = findInternalUser(leader.Nombre, ['Líder de taller']);
+      const internalUser = findInternalUser(leader.Nombre, ['Tallerista']);
       await loadInternalCommunicationForUser(internalUser);
     } catch (error) {
       setStatus(error.message);
@@ -724,9 +724,20 @@ export default function App() {
     const normalizedRoles = roles.map(role => normalize(role));
 
     return internalUsers.find(user => {
-      const sameName = normalize(user.Nombre) === targetName;
+      const userName = normalize(user.Nombre);
+      const sameName =
+        userName === targetName ||
+        userName.includes(targetName) ||
+        targetName.includes(userName);
+
       const roleText = normalize(user.Rol);
-      const sameRole = normalizedRoles.length === 0 || normalizedRoles.some(role => roleText === role || roleText.includes(role));
+      const sameRole =
+        normalizedRoles.length === 0 ||
+        normalizedRoles.some(role =>
+          roleText === role ||
+          roleText.includes(role) ||
+          role.includes(roleText)
+        );
 
       return sameName && sameRole;
     }) || null;
@@ -941,6 +952,12 @@ export default function App() {
 
   function renderInternalCommunicationPanel({ showAll = false } = {}) {
     const currentUserId = String(selectedInternalUser?.ID_USUARIO || '');
+    const selectableInternalUsers = internalUsers.filter((user, index, arr) => {
+      const id = String(user.ID_USUARIO || '');
+      if (!id) return false;
+
+      return arr.findIndex(other => String(other.ID_USUARIO || '') === id) === index;
+    });
 
     const receivedMessages = internalMessages.filter(message => {
       const visible = normalizeStatus(message.Estado) !== 'archivado';
@@ -984,7 +1001,7 @@ export default function App() {
           <label>Destinatario</label>
           <select value={messageDestinationId} onChange={e => setMessageDestinationId(e.target.value)}>
             <option value="">Seleccionar destinatario</option>
-            {internalUsers
+            {selectableInternalUsers
               .filter(user => String(user.ID_USUARIO) !== currentUserId)
               .map(user => (
                 <option key={user.ID_USUARIO} value={user.ID_USUARIO}>
@@ -1018,7 +1035,7 @@ export default function App() {
           <label>Destinatario</label>
           <select value={taskDestinationId} onChange={e => setTaskDestinationId(e.target.value)}>
             <option value="">Seleccionar destinatario</option>
-            {internalUsers
+            {selectableInternalUsers
               .filter(user => String(user.ID_USUARIO) !== currentUserId)
               .map(user => (
                 <option key={user.ID_USUARIO} value={user.ID_USUARIO}>
@@ -1269,7 +1286,7 @@ export default function App() {
             {infodeskPeople.map(person => (
               <button
                 className="tutor-card"
-                key={person.ID_PERSONA}
+                key={person.ID_PERSONA || person.ID_PERSONA_INFODESK || person.Nombre}
                 onClick={() => openInfodesk(person.Nombre)}
               >
                 {person.Nombre}
@@ -1709,7 +1726,10 @@ export default function App() {
 
           <div className="tutor-grid">
             {internalUsers
-              .filter(user => normalizeStatus(user.Rol) === 'team lead')
+              .filter((user, index, arr) =>
+                normalizeStatus(user.Rol) === 'team lead' &&
+                arr.findIndex(other => String(other.ID_USUARIO) === String(user.ID_USUARIO)) === index
+              )
               .map(user => (
                 <button
                   className="tutor-card"
@@ -1747,7 +1767,7 @@ export default function App() {
 
           <div className="tutor-grid">
             {(initialData.workshopLeaders || []).map(leader => (
-              <button className="tutor-card" key={leader.ID_LIDER} onClick={() => openWorkshopLeader(leader)}>
+              <button className="tutor-card" key={leader.ID_LIDER || leader.ID_LIDER_TALLER || leader.Nombre} onClick={() => openWorkshopLeader(leader)}>
                 {leader.Nombre}
               </button>
             ))}
