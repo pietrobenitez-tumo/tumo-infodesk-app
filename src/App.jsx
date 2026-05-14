@@ -16,7 +16,12 @@ import {
   getAttendanceForDate,
   getInfodeskTasks,
   saveInfodeskTask,
-  updateInfodeskTask
+  updateInfodeskTask,
+  getInternalCommunicationData,
+  saveInternalMessage,
+  updateInternalMessage,
+  saveInternalTask,
+  updateInternalTask
 } from './api';
 import './styles.css';
 
@@ -68,6 +73,18 @@ export default function App() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [profile, setProfile] = useState(null);
 
+  const [internalUsers, setInternalUsers] = useState([]);
+  const [selectedInternalUser, setSelectedInternalUser] = useState(null);
+  const [internalMessages, setInternalMessages] = useState([]);
+  const [internalTasks, setInternalTasks] = useState([]);
+  const [messageDestinationId, setMessageDestinationId] = useState('');
+  const [messageSubject, setMessageSubject] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+  const [taskDestinationId, setTaskDestinationId] = useState('');
+  const [internalTaskTitle, setInternalTaskTitle] = useState('');
+  const [internalTaskDescription, setInternalTaskDescription] = useState('');
+  const [internalTaskPriority, setInternalTaskPriority] = useState('Media');
+
   useEffect(() => {
     loadInitial();
   }, []);
@@ -87,6 +104,7 @@ export default function App() {
       setInitialData(data);
       setInfodeskPeople(data.infodeskPeople || []);
       setAlerts(data.alerts || []);
+      setInternalUsers(data.internalUsers || []);
       setStatus('');
     } catch (error) {
       setStatus(error.message);
@@ -101,6 +119,7 @@ export default function App() {
       setInitialData(data);
       setInfodeskPeople(data.infodeskPeople || []);
       setAlerts(data.alerts || []);
+      setInternalUsers(data.internalUsers || []);
     } catch (error) {
       setStatus(error.message);
     }
@@ -690,6 +709,199 @@ export default function App() {
     }
   }
 
+
+  async function openInternalCommunication(user) {
+    try {
+      setSelectedInternalUser(user);
+      setView('internalCommunication');
+
+      const data = await getInternalCommunicationData({
+        userId: user.ID_USUARIO
+      });
+
+      setInternalUsers(data.users || []);
+      setInternalMessages(data.messages || []);
+      setInternalTasks(data.tasks || []);
+
+      setMessageDestinationId('');
+      setMessageSubject('');
+      setMessageBody('');
+      setTaskDestinationId('');
+      setInternalTaskTitle('');
+      setInternalTaskDescription('');
+      setInternalTaskPriority('Media');
+      setStatus('');
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function refreshInternalCommunication(user = selectedInternalUser) {
+    try {
+      if (!user) return;
+
+      const data = await getInternalCommunicationData({
+        userId: user.ID_USUARIO
+      });
+
+      setInternalUsers(data.users || []);
+      setInternalMessages(data.messages || []);
+      setInternalTasks(data.tasks || []);
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function createInternalMessage() {
+    try {
+      if (!selectedInternalUser) throw new Error('Seleccioná un usuario.');
+      if (!messageDestinationId) throw new Error('Seleccioná un destinatario.');
+      if (!messageSubject.trim() && !messageBody.trim()) throw new Error('Escribí asunto o mensaje.');
+
+      const res = await saveInternalMessage({
+        origenId: selectedInternalUser.ID_USUARIO,
+        destinoId: messageDestinationId,
+        asunto: messageSubject,
+        mensaje: messageBody
+      });
+
+      setStatus(res.message || 'Mensaje enviado.');
+      setMessageDestinationId('');
+      setMessageSubject('');
+      setMessageBody('');
+      await refreshInternalCommunication();
+      await refreshInitialWithoutLoading();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function respondInternalMessage(message) {
+    try {
+      if (!selectedInternalUser) throw new Error('Seleccioná un usuario.');
+
+      const respuesta = prompt('Respuesta al mensaje:', message.Respuesta || '');
+      if (respuesta === null) return;
+
+      const res = await updateInternalMessage({
+        idMensaje: message.ID_MENSAJE,
+        estado: respuesta.trim() ? 'Respondido' : 'Pendiente',
+        respuesta,
+        respondidoPor: selectedInternalUser.Nombre
+      });
+
+      setStatus(res.message || 'Mensaje actualizado.');
+      await refreshInternalCommunication();
+      await refreshInitialWithoutLoading();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function archiveInternalMessage(message) {
+    try {
+      const res = await updateInternalMessage({
+        idMensaje: message.ID_MENSAJE,
+        estado: 'Archivado',
+        respuesta: message.Respuesta || '',
+        respondidoPor: selectedInternalUser?.Nombre || ''
+      });
+
+      setStatus(res.message || 'Mensaje archivado.');
+      await refreshInternalCommunication();
+      await refreshInitialWithoutLoading();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function createInternalTask() {
+    try {
+      if (!selectedInternalUser) throw new Error('Seleccioná un usuario.');
+      if (!taskDestinationId) throw new Error('Seleccioná un destinatario.');
+      if (!internalTaskTitle.trim()) throw new Error('Escribí el título de la tarea.');
+
+      const res = await saveInternalTask({
+        creadoPorId: selectedInternalUser.ID_USUARIO,
+        destinoId: taskDestinationId,
+        titulo: internalTaskTitle,
+        descripcion: internalTaskDescription,
+        prioridad: internalTaskPriority,
+        estado: 'Pendiente'
+      });
+
+      setStatus(res.message || 'Tarea creada.');
+      setTaskDestinationId('');
+      setInternalTaskTitle('');
+      setInternalTaskDescription('');
+      setInternalTaskPriority('Media');
+      await refreshInternalCommunication();
+      await refreshInitialWithoutLoading();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function editInternalTask(task) {
+    try {
+      if (!selectedInternalUser) throw new Error('Seleccioná un usuario.');
+
+      const titulo = prompt('Título de la tarea:', task.Titulo || '') ?? (task.Titulo || '');
+      if (!titulo.trim()) return;
+
+      const descripcion = prompt('Descripción:', task.Descripcion || '') ?? (task.Descripcion || '');
+      const comentarios = prompt('Comentarios:', task.Comentarios || '') ?? (task.Comentarios || '');
+
+      const estado = prompt(
+        'Estado: Pendiente, En proceso o Resuelto',
+        task.Estado || 'Pendiente'
+      ) || task.Estado || 'Pendiente';
+
+      const prioridad = prompt(
+        'Prioridad: Baja, Media, Alta o Urgente',
+        task.Prioridad || 'Media'
+      ) || task.Prioridad || 'Media';
+
+      const res = await updateInternalTask({
+        idTarea: task.ID_TAREA,
+        titulo,
+        descripcion,
+        comentarios,
+        estado,
+        prioridad,
+        resueltoPor: normalizeStatus(estado) === 'resuelto' ? selectedInternalUser.Nombre : ''
+      });
+
+      setStatus(res.message || 'Tarea actualizada.');
+      await refreshInternalCommunication();
+      await refreshInitialWithoutLoading();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function resolveInternalTask(task) {
+    try {
+      const comentarios = prompt('Comentario de resolución:', task.Comentarios || '') ?? (task.Comentarios || '');
+
+      const res = await updateInternalTask({
+        idTarea: task.ID_TAREA,
+        titulo: task.Titulo || '',
+        descripcion: task.Descripcion || '',
+        prioridad: task.Prioridad || 'Media',
+        estado: 'Resuelto',
+        comentarios,
+        resueltoPor: selectedInternalUser?.Nombre || ''
+      });
+
+      setStatus(res.message || 'Tarea resuelta.');
+      await refreshInternalCommunication();
+      await refreshInitialWithoutLoading();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
   const groupStudents = useMemo(() => {
     return tutorStudents.filter(s => s.Grupo_App === selectedGroup);
   }, [tutorStudents, selectedGroup]);
@@ -774,7 +986,7 @@ export default function App() {
       {status && <div className="status">{status}</div>}
 
       {view === 'home' && (
-        <main className="home-grid three">
+        <main className="home-grid">
           <button className="home-card" onClick={() => setView('selectInfodesk')}>
             <h2>Infodesk</h2>
             <p>Préstamos, devoluciones, materiales, incidencias y llegadas tarde.</p>
@@ -792,6 +1004,32 @@ export default function App() {
             <p>Asistencia, participación y seguimiento de talleres.</p>
             <strong>{initialData.summary?.workshopLeaders || 0} líderes</strong>
           </button>
+
+          <button className="home-card" onClick={() => setView('selectInternalUser')}>
+            <h2>Comunicación interna</h2>
+            <p>Mensajes y tareas entre Infodesk, tutores, líderes de taller y Team Lead.</p>
+            <strong>{initialData.summary?.pendingInternalMessages || 0} mensajes pendientes</strong>
+          </button>
+        </main>
+      )}
+
+      {view === 'selectInternalUser' && (
+        <main className="card">
+          <h2>Comunicación interna</h2>
+          <p>Seleccioná quién sos para ver tus mensajes y tareas.</p>
+
+          <div className="tutor-grid">
+            {internalUsers.map(user => (
+              <button
+                className="tutor-card"
+                key={user.ID_USUARIO}
+                onClick={() => openInternalCommunication(user)}
+              >
+                <strong>{user.Nombre}</strong>
+                <span>{user.Rol}</span>
+              </button>
+            ))}
+          </div>
         </main>
       )}
 
@@ -1228,6 +1466,208 @@ export default function App() {
           </section>
 
           <StudentProfile profile={profile} onAddComment={addCommentToStudent} />
+        </main>
+      )}
+
+
+      {view === 'internalCommunication' && (
+        <main className="grid-main">
+          <section className="card">
+            <h2>Comunicación interna</h2>
+
+            {selectedInternalUser && (
+              <p>
+                <strong>Ingresaste como:</strong> {selectedInternalUser.Nombre} · {selectedInternalUser.Rol}
+              </p>
+            )}
+
+            <section className="subsection">
+              <h3>Enviar mensaje</h3>
+
+              <label>Destinatario</label>
+              <select value={messageDestinationId} onChange={e => setMessageDestinationId(e.target.value)}>
+                <option value="">Seleccionar destinatario</option>
+                {internalUsers
+                  .filter(user => String(user.ID_USUARIO) !== String(selectedInternalUser?.ID_USUARIO))
+                  .map(user => (
+                    <option key={user.ID_USUARIO} value={user.ID_USUARIO}>
+                      {user.Nombre} · {user.Rol}
+                    </option>
+                  ))}
+              </select>
+
+              <label>Asunto</label>
+              <input
+                value={messageSubject}
+                onChange={e => setMessageSubject(e.target.value)}
+                placeholder="Asunto del mensaje..."
+              />
+
+              <label>Mensaje</label>
+              <textarea
+                value={messageBody}
+                onChange={e => setMessageBody(e.target.value)}
+                placeholder="Escribí el mensaje..."
+              />
+
+              <button className="btn success" onClick={createInternalMessage}>
+                Enviar mensaje
+              </button>
+            </section>
+
+            <section className="subsection">
+              <h3>Crear tarea</h3>
+
+              <label>Destinatario</label>
+              <select value={taskDestinationId} onChange={e => setTaskDestinationId(e.target.value)}>
+                <option value="">Seleccionar destinatario</option>
+                {internalUsers
+                  .filter(user => String(user.ID_USUARIO) !== String(selectedInternalUser?.ID_USUARIO))
+                  .map(user => (
+                    <option key={user.ID_USUARIO} value={user.ID_USUARIO}>
+                      {user.Nombre} · {user.Rol}
+                    </option>
+                  ))}
+              </select>
+
+              <label>Título</label>
+              <input
+                value={internalTaskTitle}
+                onChange={e => setInternalTaskTitle(e.target.value)}
+                placeholder="Título de la tarea..."
+              />
+
+              <label>Descripción</label>
+              <textarea
+                value={internalTaskDescription}
+                onChange={e => setInternalTaskDescription(e.target.value)}
+                placeholder="Detalle de la tarea..."
+              />
+
+              <label>Prioridad</label>
+              <select value={internalTaskPriority} onChange={e => setInternalTaskPriority(e.target.value)}>
+                <option>Baja</option>
+                <option>Media</option>
+                <option>Alta</option>
+                <option>Urgente</option>
+              </select>
+
+              <button className="btn success" onClick={createInternalTask}>
+                Crear tarea
+              </button>
+            </section>
+          </section>
+
+          <section className="card">
+            <h2>Mis pendientes</h2>
+
+            <h3>Mensajes recibidos</h3>
+            {internalMessages.filter(message =>
+              String(message.Destino_ID) === String(selectedInternalUser?.ID_USUARIO) &&
+              normalizeStatus(message.Estado) !== 'archivado'
+            ).length === 0 && <p>No tenés mensajes recibidos.</p>}
+
+            {internalMessages
+              .filter(message =>
+                String(message.Destino_ID) === String(selectedInternalUser?.ID_USUARIO) &&
+                normalizeStatus(message.Estado) !== 'archivado'
+              )
+              .map(message => (
+                <div className="list-item" key={message.ID_MENSAJE}>
+                  <strong>{message.Asunto || 'Sin asunto'}</strong>
+                  <span>De: {message.Origen_Nombre} · {message.Origen_Rol}</span>
+                  <span>{message.Mensaje}</span>
+                  <span>Estado: {message.Estado || 'Pendiente'} · {message.Fecha}</span>
+                  {message.Respuesta && <span>Respuesta: {message.Respuesta}</span>}
+
+                  <div className="task-actions">
+                    <button className="btn secondary" onClick={() => respondInternalMessage(message)}>
+                      Responder
+                    </button>
+                    <button className="btn light" onClick={() => archiveInternalMessage(message)}>
+                      Archivar
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+            <h3>Tareas recibidas</h3>
+            {internalTasks.filter(task =>
+              String(task.Destino_ID) === String(selectedInternalUser?.ID_USUARIO) &&
+              normalizeStatus(task.Estado) !== 'resuelto'
+            ).length === 0 && <p>No tenés tareas pendientes.</p>}
+
+            {internalTasks
+              .filter(task =>
+                String(task.Destino_ID) === String(selectedInternalUser?.ID_USUARIO) &&
+                normalizeStatus(task.Estado) !== 'resuelto'
+              )
+              .map(task => (
+                <div className="task-card" key={task.ID_TAREA}>
+                  <strong>{task.Titulo}</strong>
+                  {task.Descripcion && <span>{task.Descripcion}</span>}
+                  <span>De: {task.Creado_Por_Nombre} · {task.Creado_Por_Rol}</span>
+                  <span>Estado: {task.Estado} · Prioridad: {task.Prioridad}</span>
+                  {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
+
+                  <div className="task-actions">
+                    <button className="btn secondary" onClick={() => editInternalTask(task)}>
+                      Editar
+                    </button>
+                    <button className="btn success" onClick={() => resolveInternalTask(task)}>
+                      Marcar resuelta
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+            <h3>Mensajes enviados</h3>
+            {internalMessages.filter(message =>
+              String(message.Origen_ID) === String(selectedInternalUser?.ID_USUARIO)
+            ).length === 0 && <p>No enviaste mensajes.</p>}
+
+            {internalMessages
+              .filter(message =>
+                String(message.Origen_ID) === String(selectedInternalUser?.ID_USUARIO)
+              )
+              .slice(0, 10)
+              .map(message => (
+                <div className="list-item" key={message.ID_MENSAJE}>
+                  <strong>{message.Asunto || 'Sin asunto'}</strong>
+                  <span>Para: {message.Destino_Nombre} · {message.Destino_Rol}</span>
+                  <span>{message.Mensaje}</span>
+                  <span>Estado: {message.Estado || 'Pendiente'} · {message.Fecha}</span>
+                  {message.Respuesta && <span>Respuesta: {message.Respuesta}</span>}
+                </div>
+              ))}
+
+            <h3>Tareas enviadas</h3>
+            {internalTasks.filter(task =>
+              String(task.Creado_Por_ID) === String(selectedInternalUser?.ID_USUARIO)
+            ).length === 0 && <p>No creaste tareas.</p>}
+
+            {internalTasks
+              .filter(task =>
+                String(task.Creado_Por_ID) === String(selectedInternalUser?.ID_USUARIO)
+              )
+              .slice(0, 10)
+              .map(task => (
+                <div className={`task-card ${normalizeStatus(task.Estado) === 'resuelto' ? 'resolved' : ''}`} key={task.ID_TAREA}>
+                  <strong>{task.Titulo}</strong>
+                  {task.Descripcion && <span>{task.Descripcion}</span>}
+                  <span>Para: {task.Destino_Nombre} · {task.Destino_Rol}</span>
+                  <span>Estado: {task.Estado} · Prioridad: {task.Prioridad}</span>
+                  {task.Comentarios && <span>Comentarios: {task.Comentarios}</span>}
+                  {task.Fecha_Resolucion && <span>Resuelta: {task.Fecha_Resolucion} · Por: {task.Resuelto_Por}</span>}
+
+                  <div className="task-actions">
+                    <button className="btn secondary" onClick={() => editInternalTask(task)}>
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </section>
         </main>
       )}
 
