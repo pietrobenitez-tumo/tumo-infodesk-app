@@ -120,3 +120,23 @@ export function saveInfodeskTask(data) {
 export function updateInfodeskTask(data) {
   return apiPost('updateInfodeskTask', data);
 }
+
+export function getInternalCommunicationData(data = {}) {
+  return apiPost('getInternalCommunicationData', data);
+}
+
+export function saveInternalMessage(data) {
+  return apiPost('saveInternalMessage', data);
+}
+
+export function updateInternalMessage(data) {
+  return apiPost('updateInternalMessage', data);
+}
+
+export function saveInternalTask(data) {
+  return apiPost('saveInternalTask', data);
+}
+
+export function updateInternalTask(data) {
+  return apiPost('updateInternalTask', data);
+}
