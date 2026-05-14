@@ -1040,3 +1040,36 @@ textarea {
 .internal-communication-toggle .message-badge {
   margin-left: auto;
 }
+/* =========================
+   BOTÓN COMUNICACIÓN INTERNA - CORRECCIÓN COLOR
+========================= */
+
+.internal-communication-toggle {
+  background: #eff6ff !important;
+  color: #1e3a8a !important;
+  border: 1px solid #93c5fd !important;
+}
+
+.internal-communication-toggle span {
+  color: #1e3a8a !important;
+}
+
+.internal-communication-toggle:hover {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+}
+
+.internal-communication-toggle.has-pending-messages {
+  background: #fff7ed !important;
+  color: #9a3412 !important;
+  border-color: #fdba74 !important;
+}
+
+.internal-communication-toggle.has-pending-messages span {
+  color: #9a3412 !important;
+}
+
+.internal-communication-toggle .message-badge {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
