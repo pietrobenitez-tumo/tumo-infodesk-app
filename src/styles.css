@@ -728,3 +728,152 @@ textarea {
   margin-top: 4px;
   font-size: 12px;
 }
+/* =========================
+   COMUNICACIÓN INTERNA COMPACTA
+========================= */
+
+.right-column-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.internal-communication {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-left: 5px solid #38bdf8;
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.internal-communication h3 {
+  margin-top: 0;
+  margin-bottom: 6px;
+  color: #0f172a;
+}
+
+.internal-communication p {
+  margin: 4px 0 10px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.internal-communication details {
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  margin-top: 8px;
+  padding: 8px 10px;
+}
+
+.internal-communication summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  color: #075985;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.internal-communication summary::after {
+  content: "Abrir";
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  background: #e0f2fe;
+  padding: 3px 7px;
+  border-radius: 999px;
+}
+
+.internal-communication details[open] summary::after {
+  content: "Cerrar";
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.internal-communication label {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.internal-communication input,
+.internal-communication select,
+.internal-communication textarea {
+  font-size: 13px;
+  min-height: 34px;
+}
+
+.internal-communication textarea {
+  min-height: 62px;
+}
+
+.internal-communication .btn {
+  width: auto;
+  min-width: auto;
+  padding: 7px 11px;
+  font-size: 12px;
+  border-radius: 9px;
+  margin-top: 8px;
+}
+
+.internal-communication .list-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #60a5fa;
+  border-radius: 11px;
+  padding: 8px;
+  margin-top: 8px;
+}
+
+.internal-communication .task-card {
+  background: #fefce8;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #facc15;
+  border-radius: 11px;
+  padding: 8px;
+  margin-top: 8px;
+}
+
+.internal-communication .task-card.resolved {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  border-left-color: #22c55e;
+}
+
+.internal-communication .task-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.internal-communication .task-actions .btn {
+  margin-top: 0;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+/* Pasteles por bloque principal */
+.grid-main > .card:nth-child(1) {
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+}
+
+.grid-main > .card:nth-child(2),
+.grid-main > .right-column-stack > .card {
+  background: #fffaf0;
+  border: 1px solid #fde68a;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .right-column-stack {
+    gap: 10px;
+  }
+
+  .internal-communication {
+    order: -1;
+  }
+}
