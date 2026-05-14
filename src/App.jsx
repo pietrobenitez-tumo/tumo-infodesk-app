@@ -995,7 +995,7 @@ export default function App() {
           <strong>Perfil:</strong> {selectedInternalUser.Nombre} · {selectedInternalUser.Rol}
         </p>
 
-        <details open>
+        <details>
           <summary>Enviar mensaje</summary>
 
           <label>Destinatario</label>
@@ -1071,7 +1071,7 @@ export default function App() {
           </button>
         </details>
 
-        <details open>
+        <details>
           <summary>{showAll ? 'Mensajes recibidos del equipo' : 'Mensajes recibidos'}</summary>
 
           {receivedMessages.length === 0 && <p>No hay mensajes recibidos.</p>}
@@ -1097,7 +1097,7 @@ export default function App() {
           ))}
         </details>
 
-        <details open>
+        <details>
           <summary>{showAll ? 'Tareas pendientes del equipo' : 'Tareas recibidas'}</summary>
 
           {receivedTasks.length === 0 && <p>No hay tareas pendientes.</p>}
@@ -1302,8 +1302,6 @@ export default function App() {
             <h2>Infodesk</h2>
             <p><strong>Registrando como:</strong> {selectedInfodesk}</p>
 
-            {renderInternalCommunicationPanel()}
-
             <section className="subsection">
               <h3>Tareas de Infodesk</h3>
 
@@ -1454,8 +1452,11 @@ export default function App() {
             )}
           </section>
 
-          <section className="card">
-            <h2>Perfil del alumno</h2>
+          <section className="right-column-stack">
+            {renderInternalCommunicationPanel()}
+
+            <section className="card">
+              <h2>Perfil del alumno</h2>
 
             {!infodeskProfile && <p>Buscá y seleccioná un alumno.</p>}
 
@@ -1484,6 +1485,7 @@ export default function App() {
 >
   Ver historial de préstamos
 </button>
+            </section>
           </section>
         </main>
       )}
@@ -1512,8 +1514,6 @@ export default function App() {
 >
   Enviar tarea a Infodesk
 </button>
-
-            {renderInternalCommunicationPanel()}
 
             {tutorAlerts.length > 0 && (
               <>
@@ -1714,7 +1714,10 @@ export default function App() {
             )}
           </section>
 
-          <StudentProfile profile={profile} onAddComment={addCommentToStudent} />
+          <section className="right-column-stack">
+            {renderInternalCommunicationPanel()}
+            <StudentProfile profile={profile} onAddComment={addCommentToStudent} />
+          </section>
         </main>
       )}
 
@@ -1779,8 +1782,6 @@ export default function App() {
         <main className="grid-main">
           <section className="card">
             <h2>{selectedLeader?.Nombre}</h2>
-
-            {renderInternalCommunicationPanel()}
 
             <label>Taller</label>
             <select
@@ -1869,8 +1870,11 @@ export default function App() {
             )}
           </section>
 
-          <section className="card">
-            <h2>Alertas</h2>
+          <section className="right-column-stack">
+            {renderInternalCommunicationPanel()}
+
+            <section className="card">
+              <h2>Alertas</h2>
             {alerts.map(alert => (
               <div className="alert" key={alert.ID_ALERTA}>
                 <strong>{alert.Alumno}</strong>
@@ -1878,6 +1882,7 @@ export default function App() {
                 <span>Estado: {alert.Estado_Gestion || 'Pendiente'}</span>
               </div>
             ))}
+            </section>
           </section>
         </main>
       )}
