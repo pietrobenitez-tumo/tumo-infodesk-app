@@ -462,7 +462,7 @@ export default function App() {
       const record = data.records[idAlumno];
 
       rows[String(idAlumno)] = {
-        estado: record.Estado || 'Presente',
+        estado: record.Estado || record.Estado_Asistencia || 'Presente',
         horaLlegada: record.Hora_Llegada || '',
         comentario: record.Comentario || ''
       };
@@ -2197,7 +2197,7 @@ function AttendanceDots({ items }) {
           return <span key={index} className="dot empty" title="Sin registro" />;
         }
 
-        const rawEstado = item.Estado || item.estado || '';
+        const rawEstado = item.Estado || item.Estado_Asistencia || item.estado || '';
         const estado = normalizeStatus(rawEstado);
         const comentario = item.Comentario || item.comentario || '';
         const hasComment = Boolean(String(comentario).trim());
