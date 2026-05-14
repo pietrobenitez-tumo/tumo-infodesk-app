@@ -965,6 +965,12 @@ export default function App() {
       return showAll || String(message.Destino_ID) === currentUserId;
     });
 
+    const pendingReceivedMessages = receivedMessages.filter(message =>
+        normalizeStatus(message.Estado) === 'pendiente'
+    );
+
+const pendingReceivedCount = pendingReceivedMessages.length;
+
     const sentMessages = internalMessages.filter(message => {
       return showAll || String(message.Origen_ID) === currentUserId;
     });
@@ -989,8 +995,16 @@ export default function App() {
     }
 
     return (
-      <section className="subsection internal-communication">
-        <h3>Comunicación interna</h3>
+      <section className={`subsection internal-communication ${pendingReceivedCount > 0 ? 'has-pending-messages' : ''}`}>
+  <div className="internal-title-row">
+    <h3>Comunicación interna</h3>
+
+    {pendingReceivedCount > 0 && (
+      <span className="message-badge">
+        {pendingReceivedCount}
+      </span>
+    )}
+  </div>
         <p>
           <strong>Perfil:</strong> {selectedInternalUser.Nombre} · {selectedInternalUser.Rol}
         </p>
@@ -1072,8 +1086,15 @@ export default function App() {
         </details>
 
         <details>
-          <summary>{showAll ? 'Mensajes recibidos del equipo' : 'Mensajes recibidos'}</summary>
+         <summary>
+  <span>{showAll ? 'Mensajes recibidos del equipo' : 'Mensajes recibidos'}</span>
 
+  {pendingReceivedCount > 0 && (
+    <span className="summary-badge">
+      {pendingReceivedCount} pendiente{pendingReceivedCount > 1 ? 's' : ''}
+    </span>
+  )}
+</summary>
           {receivedMessages.length === 0 && <p>No hay mensajes recibidos.</p>}
 
           {receivedMessages.map(message => (
