@@ -1677,7 +1677,7 @@ export default function App() {
                           <button
                             key={option}
                             title={option}
-                            className={`small-btn compact-status-btn status-${normalizeStatus(option)} ${estado === option ? 'active' : ''}`}
+                            className={`small-btn compact-status-btn ${estado === option ? 'active' : ''}`}
                             onClick={() => setAttendance(student.ID_ALUMNO, option)}
                           >
                             {label}
