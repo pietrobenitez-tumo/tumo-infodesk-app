@@ -1005,8 +1005,7 @@ export default function App() {
     if (!showInternalCommunication) {
       return (
         <button
-          className={`internal-communication-toggle ${pendingReceivedCount > 0 ? 'has-pending-messages' : ''}`}
-          onClick={() => setShowInternalCommunication(true)}
+          className={`btn secondary internal-communication-toggle ${pendingReceivedCount > 0 ? 'has-pending-messages' : ''}`}          onClick={() => setShowInternalCommunication(true)}
         >
           <span>Comunicación interna</span>
 
