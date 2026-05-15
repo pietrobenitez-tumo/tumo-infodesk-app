@@ -364,7 +364,7 @@ export default function App() {
     try {
       if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
       if (!quickLoanStudent) throw new Error('Seleccioná un alumno para el préstamo.');
-      if (!quickLoanMaterialId) throw new Error('Seleccioná un material.');
+      if (!quickLoanMaterialId) throw new Error('Seleccioná un material con ID_MATERIAL válido. Revisá que ese mouse o auricular tenga ID en la hoja MATERIALES.');
 
       const material = materials.find(m => String(m.ID_MATERIAL) === String(quickLoanMaterialId));
       const materialLabel = formatMaterialDisplay(material);
@@ -1333,10 +1333,13 @@ export default function App() {
 
   const availableMaterials = useMemo(() => {
     return materials
-      .filter(m => String(m.Estado || '').toLowerCase() !== 'prestado')
+      .filter(m => normalizeStatus(m.Estado) !== 'prestado')
       .filter((m, index, arr) => {
-        const key = String(m.ID_MATERIAL || `${m.Tipo || ''}-${m.Codigo || ''}`).trim();
-        return key && arr.findIndex(x => String(x.ID_MATERIAL || `${x.Tipo || ''}-${x.Codigo || ''}`).trim() === key) === index;
+        const id = String(m.ID_MATERIAL || '').trim();
+
+        if (!id) return true;
+
+        return arr.findIndex(x => String(x.ID_MATERIAL || '').trim() === id) === index;
       });
   }, [materials]);
 
@@ -1477,9 +1480,13 @@ export default function App() {
               <label>Material disponible</label>
               <select value={quickLoanMaterialId} onChange={e => setQuickLoanMaterialId(e.target.value)}>
                 <option value="">Seleccionar material</option>
-                {availableMaterials.map(m => (
-                  <option key={m.ID_MATERIAL || `${m.Tipo}-${m.Codigo}`} value={m.ID_MATERIAL}>
-                    {formatMaterialDisplay(m)} · {m.Estado || 'Disponible'}
+                {availableMaterials.map((m, index) => (
+                  <option
+                    key={`${m.ID_MATERIAL || 'SIN-ID'}-${index}`}
+                    value={m.ID_MATERIAL || ''}
+                    disabled={!m.ID_MATERIAL}
+                  >
+                    {formatMaterialDisplay(m)} · {m.Estado || 'Disponible'}{!m.ID_MATERIAL ? ' · sin ID en hoja' : ''}
                   </option>
                 ))}
               </select>
