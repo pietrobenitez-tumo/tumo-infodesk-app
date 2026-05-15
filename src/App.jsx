@@ -390,7 +390,28 @@ export default function App() {
   }
 
   async function closeLoan(loan, estadoPrestamo = 'Devuelto', estadoMaterial = 'Disponible') {
+    const previousOpenLoans = openLoans;
+    const previousAllLoans = allLoans;
+
     try {
+      setOpenLoans(prev => prev.filter(item => String(item.ID_PRESTAMO) !== String(loan.ID_PRESTAMO)));
+      setAllLoans(prev => prev.map(item => {
+        if (String(item.ID_PRESTAMO) !== String(loan.ID_PRESTAMO)) return item;
+
+        return {
+          ...item,
+          Estado: estadoPrestamo,
+          Fecha_Devolucion: today(),
+          Recibido_Por: selectedInfodesk
+        };
+      }));
+
+      setStatus(
+        estadoPrestamo === 'Dañado'
+          ? 'Material marcado como dañado. Guardando...'
+          : 'Devolución registrada visualmente. Guardando...'
+      );
+
       const res = await returnLoan({
         idPrestamo: loan.ID_PRESTAMO,
         idMaterial: loan.ID_MATERIAL,
@@ -400,10 +421,11 @@ export default function App() {
       });
 
       setStatus(res.message || 'Devolución registrada.');
-      await refreshInfodesk();
       await refreshInitialWithoutLoading();
     } catch (error) {
-      setStatus(error.message);
+      setOpenLoans(previousOpenLoans);
+      setAllLoans(previousAllLoans);
+      setStatus(`No se pudo guardar la devolución: ${error.message}`);
     }
   }
 
@@ -1343,6 +1365,24 @@ export default function App() {
       });
   }, [materials]);
 
+
+  const sortedOpenLoans = useMemo(() => {
+    return [...openLoans].sort((a, b) => {
+      const materialA = getMaterialSortValue(a);
+      const materialB = getMaterialSortValue(b);
+
+      if (materialA.prefix !== materialB.prefix) {
+        return materialA.prefix.localeCompare(materialB.prefix);
+      }
+
+      if (materialA.number !== materialB.number) {
+        return materialA.number - materialB.number;
+      }
+
+      return String(a.Alumno || '').localeCompare(String(b.Alumno || ''));
+    });
+  }, [openLoans]);
+
   const tutorAlerts = useMemo(() => {
     if (!selectedTutor) return [];
     return alerts.filter(alert => normalize(alert.Tutor_TUMO) === normalize(selectedTutor.Nombre));
@@ -1666,21 +1706,32 @@ export default function App() {
                 </button>
               </div>
 
-              {openLoans.length === 0 && <p>No hay préstamos abiertos.</p>}
+              {sortedOpenLoans.length === 0 && <p>No hay préstamos abiertos.</p>}
 
-              {openLoans.map(loan => (
-                <div className="list-item" key={loan.ID_PRESTAMO}>
-                  <strong>{loan.Alumno}</strong>
-                  <span>{formatMaterialDisplay(loan)} · {loan.Fecha_Prestamo}</span>
-                  <span>{loan.Grupo_App}</span>
-                  <button className="btn success" onClick={() => closeLoan(loan)}>
-                    Devolver
-                  </button>
-                  <button className="btn danger" onClick={() => closeLoan(loan, 'Dañado', 'Dañado')}>
-                    Marcar dañado
-                  </button>
-                </div>
-              ))}
+              <div className="open-loans-grid">
+                {sortedOpenLoans.map(loan => (
+                  <div className="loan-compact-card" key={loan.ID_PRESTAMO}>
+                    <div className="loan-compact-title">
+                      <span className="loan-student-name">{loan.Alumno || loan.ID_ALUMNO}</span>
+                      <span className="loan-material-code">{formatMaterialDisplay(loan)}</span>
+                    </div>
+
+                    <div className="loan-compact-meta">
+                      <span>{loan.Grupo_App}</span>
+                      <span>{loan.Fecha_Prestamo}</span>
+                    </div>
+
+                    <div className="loan-compact-actions">
+                      <button className="btn success loan-return-btn" onClick={() => closeLoan(loan)}>
+                        Devolver
+                      </button>
+                      <button className="btn danger loan-damaged-btn" onClick={() => closeLoan(loan, 'Dañado', 'Dañado')}>
+                        Dañado
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </section>
 
 
@@ -2382,6 +2433,24 @@ function getStudentPreviousTutor(student = {}) {
     student.Anterior_Tutor ||
     ''
   );
+}
+
+
+function getMaterialSortValue(item = {}) {
+  const display = formatMaterialDisplay(item);
+  const match = String(display || '').match(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)[\\s._-]*(\\d+)/);
+
+  if (!match) {
+    return {
+      prefix: String(display || '').toLowerCase(),
+      number: Number.MAX_SAFE_INTEGER
+    };
+  }
+
+  return {
+    prefix: match[1].toLowerCase(),
+    number: Number(match[2])
+  };
 }
 
 function formatMaterialDisplay(item = {}) {
