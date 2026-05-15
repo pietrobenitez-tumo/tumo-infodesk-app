@@ -52,6 +52,9 @@ export default function App() {
   const [infodeskProfile, setInfodeskProfile] = useState(null);
 
   const [loanMaterialId, setLoanMaterialId] = useState('');
+  const [quickLoanSearch, setQuickLoanSearch] = useState('');
+  const [quickLoanStudent, setQuickLoanStudent] = useState(null);
+  const [quickLoanMaterialId, setQuickLoanMaterialId] = useState('');
   const [incidentText, setIncidentText] = useState('');
   const [commentText, setCommentText] = useState('');
   const [lateTime, setLateTime] = useState(currentTime());
@@ -146,6 +149,9 @@ export default function App() {
       setCommentText('');
       setIncidentText('');
       setLoanMaterialId('');
+      setQuickLoanSearch('');
+      setQuickLoanStudent(null);
+      setQuickLoanMaterialId('');
       setLateTime(currentTime());
       setShowInternalCommunication(false);
       setShowInfodeskTaskForm(false);
@@ -353,6 +359,36 @@ export default function App() {
     }
   }
 
+
+  async function createQuickLoan() {
+    try {
+      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
+      if (!quickLoanStudent) throw new Error('Seleccioná un alumno para el préstamo.');
+      if (!quickLoanMaterialId) throw new Error('Seleccioná un material.');
+
+      const material = materials.find(m => String(m.ID_MATERIAL) === String(quickLoanMaterialId));
+      const materialLabel = formatMaterialDisplay(material);
+
+      const res = await createLoan({
+        idAlumno: quickLoanStudent.ID_ALUMNO,
+        idMaterial: quickLoanMaterialId,
+        material: materialLabel,
+        personaInfodesk: selectedInfodesk
+      });
+
+      setStatus(res.message || 'Préstamo registrado.');
+      setQuickLoanSearch('');
+      setQuickLoanStudent(null);
+      setQuickLoanMaterialId('');
+      setLoanMaterialId('');
+
+      await refreshInfodesk();
+      await refreshInitialWithoutLoading();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
   async function closeLoan(loan, estadoPrestamo = 'Devuelto', estadoMaterial = 'Disponible') {
     try {
       const res = await returnLoan({
@@ -366,10 +402,6 @@ export default function App() {
       setStatus(res.message || 'Devolución registrada.');
       await refreshInfodesk();
       await refreshInitialWithoutLoading();
-
-      if (infodeskStudent) {
-        await selectInfodeskStudent(infodeskStudent);
-      }
     } catch (error) {
       setStatus(error.message);
     }
@@ -463,7 +495,7 @@ export default function App() {
       const record = data.records[idAlumno];
 
       rows[String(idAlumno)] = {
-        estado: record.Estado || 'Presente',
+        estado: record.Estado || record.Estado_Asistencia || 'Presente',
         horaLlegada: record.Hora_Llegada || '',
         comentario: record.Comentario || ''
       };
@@ -1006,7 +1038,8 @@ export default function App() {
     if (!showInternalCommunication) {
       return (
         <button
-          className={`btn secondary internal-communication-toggle ${pendingReceivedCount > 0 ? 'has-pending-messages' : ''}`}          onClick={() => setShowInternalCommunication(true)}
+          className={`btn secondary internal-communication-toggle ${pendingReceivedCount > 0 ? 'has-pending-messages' : ''`}
+          onClick={() => setShowInternalCommunication(true)}
         >
           <span>Comunicación interna</span>
 
@@ -1272,6 +1305,41 @@ export default function App() {
       .slice(0, 20);
   }, [students, infodeskSearch]);
 
+
+  const filteredQuickLoanStudents = useMemo(() => {
+    const q = normalize(quickLoanSearch);
+    if (!q || quickLoanStudent) return [];
+
+    return students
+      .filter(s => {
+        const text = normalize(`
+          ${s.Nombre || ''}
+          ${s.Apellido || ''}
+          ${s.Nombre_Completo || ''}
+          ${s.CI || ''}
+          ${s.Documento || ''}
+          ${s.Cedula || ''}
+          ${s.Cédula || ''}
+          ${s.Usuario || ''}
+          ${s.Grupo_App || ''}
+          ${s.Tutor_TUMO_Actual || ''}
+          ${s.Tutor_TUMO || ''}
+        `);
+
+        return text.includes(q);
+      })
+      .slice(0, 10);
+  }, [students, quickLoanSearch, quickLoanStudent]);
+
+  const availableMaterials = useMemo(() => {
+    return materials
+      .filter(m => String(m.Estado || '').toLowerCase() !== 'prestado')
+      .filter((m, index, arr) => {
+        const key = String(m.ID_MATERIAL || `${m.Tipo || ''}-${m.Codigo || ''}`).trim();
+        return key && arr.findIndex(x => String(x.ID_MATERIAL || `${x.Tipo || ''}-${x.Codigo || ''}`).trim() === key) === index;
+      });
+  }, [materials]);
+
   const tutorAlerts = useMemo(() => {
     if (!selectedTutor) return [];
     return alerts.filter(alert => normalize(alert.Tutor_TUMO) === normalize(selectedTutor.Nombre));
@@ -1355,6 +1423,71 @@ export default function App() {
           <section className="card">
             <h2>Infodesk</h2>
             <p><strong>Registrando como:</strong> {selectedInfodesk}</p>
+
+            <section className="subsection quick-loan-section">
+              <div className="section-title-row">
+                <h3>Préstamo rápido de material</h3>
+                <span className="quick-loan-count">{availableMaterials.length} disponibles</span>
+              </div>
+
+              <label>Buscar alumno</label>
+              <input
+                value={quickLoanSearch}
+                onChange={e => {
+                  setQuickLoanSearch(e.target.value);
+                  setQuickLoanStudent(null);
+                }}
+                placeholder="Nombre, usuario, cédula o grupo..."
+              />
+
+              {filteredQuickLoanStudents.length > 0 && (
+                <div className="search-results quick-loan-results">
+                  {filteredQuickLoanStudents.map(student => (
+                    <button
+                      className="search-item"
+                      key={student.ID_ALUMNO}
+                      onClick={() => {
+                        setQuickLoanStudent(student);
+                        setQuickLoanSearch(student.Nombre_Completo || `${student.Nombre || ''} ${student.Apellido || ''}`.trim());
+                      }}
+                    >
+                      <strong>{student.Nombre_Completo || `${student.Nombre || ''} ${student.Apellido || ''}`}</strong>
+                      <span>{student.Grupo_App} · {student.Usuario}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {quickLoanStudent && (
+                <div className="quick-selected-student">
+                  <strong>{quickLoanStudent.Nombre_Completo || `${quickLoanStudent.Nombre || ''} ${quickLoanStudent.Apellido || ''}`}</strong>
+                  <span>{quickLoanStudent.Grupo_App} · {quickLoanStudent.Usuario}</span>
+                  <button
+                    className="tiny-btn"
+                    onClick={() => {
+                      setQuickLoanStudent(null);
+                      setQuickLoanSearch('');
+                    }}
+                  >
+                    Cambiar
+                  </button>
+                </div>
+              )}
+
+              <label>Material disponible</label>
+              <select value={quickLoanMaterialId} onChange={e => setQuickLoanMaterialId(e.target.value)}>
+                <option value="">Seleccionar material</option>
+                {availableMaterials.map(m => (
+                  <option key={m.ID_MATERIAL || `${m.Tipo}-${m.Codigo}`} value={m.ID_MATERIAL}>
+                    {formatMaterialDisplay(m)} · {m.Estado || 'Disponible'}
+                  </option>
+                ))}
+              </select>
+
+              <button className="btn success" onClick={createQuickLoan}>
+                Registrar préstamo rápido
+              </button>
+            </section>
 
             <section className="subsection infodesk-tasks-section">
               <div className="section-title-row">
@@ -1508,26 +1641,7 @@ export default function App() {
                     Guardar incidencia
                   </button>
 
-                  <h3>Préstamo de material</h3>
-                  <label>Material disponible</label>
-                  <select value={loanMaterialId} onChange={e => setLoanMaterialId(e.target.value)}>
-                    <option value="">Seleccionar material</option>
-                    {materials
-                      .filter(m => String(m.Estado || '').toLowerCase() !== 'prestado')
-                      .filter((m, index, arr) => {
-                        const key = String(m.ID_MATERIAL || `${m.Tipo || ''}-${m.Codigo || ''}`).trim();
-                        return key && arr.findIndex(x => String(x.ID_MATERIAL || `${x.Tipo || ''}-${x.Codigo || ''}`).trim() === key) === index;
-                      })
-                      .map(m => (
-                        <option key={m.ID_MATERIAL || `${m.Tipo}-${m.Codigo}`} value={m.ID_MATERIAL}>
-                          {formatMaterialDisplay(m)} · {m.Estado || 'Disponible'}
-                        </option>
-                      ))}
-                  </select>
 
-                  <button className="btn success" onClick={createNewLoan}>
-                    Registrar préstamo
-                  </button>
                 </section>
               )}
             </section>
