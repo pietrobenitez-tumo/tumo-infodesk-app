@@ -334,11 +334,12 @@ export default function App() {
       if (!loanMaterialId) throw new Error('Seleccioná un material.');
 
       const material = materials.find(m => String(m.ID_MATERIAL) === String(loanMaterialId));
+      const materialLabel = formatMaterialDisplay(material);
 
       const res = await createLoan({
         idAlumno: infodeskStudent.ID_ALUMNO,
         idMaterial: loanMaterialId,
-        material: material?.Tipo || '',
+        material: materialLabel,
         personaInfodesk: selectedInfodesk
       });
 
@@ -462,7 +463,7 @@ export default function App() {
       const record = data.records[idAlumno];
 
       rows[String(idAlumno)] = {
-        estado: record.Estado || record.Estado_Asistencia || 'Presente',
+        estado: record.Estado || 'Presente',
         horaLlegada: record.Hora_Llegada || '',
         comentario: record.Comentario || ''
       };
@@ -1481,7 +1482,7 @@ export default function App() {
               {openLoans.map(loan => (
                 <div className="list-item" key={loan.ID_PRESTAMO}>
                   <strong>{loan.Alumno}</strong>
-                  <span>{loan.Material} · {loan.Fecha_Prestamo}</span>
+                  <span>{formatMaterialDisplay(loan)} · {loan.Fecha_Prestamo}</span>
                   <span>{loan.Grupo_App}</span>
                   <button className="btn success" onClick={() => closeLoan(loan)}>
                     Devolver
@@ -1543,9 +1544,13 @@ export default function App() {
                     <option value="">Seleccionar material</option>
                     {materials
                       .filter(m => String(m.Estado || '').toLowerCase() !== 'prestado')
+                      .filter((m, index, arr) => {
+                        const key = String(m.ID_MATERIAL || `${m.Tipo || ''}-${m.Codigo || ''}`).trim();
+                        return key && arr.findIndex(x => String(x.ID_MATERIAL || `${x.Tipo || ''}-${x.Codigo || ''}`).trim() === key) === index;
+                      })
                       .map(m => (
-                        <option key={m.ID_MATERIAL} value={m.ID_MATERIAL}>
-                          {m.Tipo} · {m.Codigo} · {m.Estado}
+                        <option key={m.ID_MATERIAL || `${m.Tipo}-${m.Codigo}`} value={m.ID_MATERIAL}>
+                          {formatMaterialDisplay(m)} · {m.Estado || 'Disponible'}
                         </option>
                       ))}
                   </select>
@@ -2064,7 +2069,7 @@ function InfodeskStudentProfile({ profile }) {
       {(profile.loans || []).length === 0 && <p>No hay préstamos registrados.</p>}
       {(profile.loans || []).map(item => (
         <div className="list-item" key={item.ID_PRESTAMO}>
-          <strong>{item.Fecha_Prestamo} · {item.Material}</strong>
+          <strong>{item.Fecha_Prestamo} · {formatMaterialDisplay(item)}</strong>
           <span>Estado: {item.Estado}</span>
           <span>Entregado por: {item.Entregado_Por}</span>
           {item.Fecha_Devolucion && <span>Devuelto: {item.Fecha_Devolucion}</span>}
@@ -2086,7 +2091,7 @@ function GeneralLoanHistory({ loans }) {
       {loans.map(loan => (
         <div className="list-item" key={loan.ID_PRESTAMO}>
           <strong>{loan.Fecha_Prestamo} · {loan.Alumno || loan.ID_ALUMNO}</strong>
-          <span>Material: {loan.Material}</span>
+          <span>Material: {formatMaterialDisplay(loan)}</span>
           <span>Estado: {loan.Estado}</span>
           <span>Grupo: {loan.Grupo_App}</span>
           <span>Tutor TUMO: {loan.Tutor_TUMO}</span>
@@ -2154,7 +2159,7 @@ function StudentProfile({ profile, onAddComment }) {
       {(profile.loans || []).length === 0 && <p>No hay préstamos registrados.</p>}
       {(profile.loans || []).map(item => (
         <div className="list-item" key={item.ID_PRESTAMO}>
-          <strong>{item.Fecha_Prestamo} · {item.Material}</strong>
+          <strong>{item.Fecha_Prestamo} · {formatMaterialDisplay(item)}</strong>
           <span>Estado: {item.Estado}</span>
           <span>Entregado por: {item.Entregado_Por}</span>
           {item.Fecha_Devolucion && <span>Devuelto: {item.Fecha_Devolucion}</span>}
@@ -2197,7 +2202,7 @@ function AttendanceDots({ items }) {
           return <span key={index} className="dot empty" title="Sin registro" />;
         }
 
-        const rawEstado = item.Estado || item.Estado_Asistencia || item.estado || '';
+        const rawEstado = item.Estado || item.estado || '';
         const estado = normalizeStatus(rawEstado);
         const comentario = item.Comentario || item.comentario || '';
         const hasComment = Boolean(String(comentario).trim());
@@ -2226,6 +2231,21 @@ function AttendanceDots({ items }) {
       })}
     </div>
   );
+}
+
+
+function formatMaterialDisplay(item = {}) {
+  const tipo = item.Tipo_Material || item.Tipo || item.Material || '';
+  const codigo = item.Codigo_Material || item.Codigo || item.Numero || item.Número || item.ID_MATERIAL || '';
+
+  const tipoText = String(tipo || '').trim();
+  const codigoText = String(codigo || '').trim();
+
+  if (tipoText && codigoText && !tipoText.includes(codigoText)) {
+    return `${tipoText} · ${codigoText}`;
+  }
+
+  return tipoText || codigoText || 'Material sin identificar';
 }
 
 function today() {
