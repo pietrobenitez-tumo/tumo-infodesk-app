@@ -1464,36 +1464,6 @@ export default function App() {
               </div>
             )}
 
-          </section>
-
-          <section className="right-column-stack">
-            {renderInternalCommunicationPanel()}
-
-            <section className="card infodesk-open-loans-card">
-              <div className="section-title-row">
-                <h2>Préstamos abiertos</h2>
-                <button className="btn secondary" onClick={() => setShowLoanHistory(true)}>
-                  Ver historial
-                </button>
-              </div>
-
-              {openLoans.length === 0 && <p>No hay préstamos abiertos.</p>}
-
-              {openLoans.map(loan => (
-                <div className="list-item" key={loan.ID_PRESTAMO}>
-                  <strong>{loan.Alumno}</strong>
-                  <span>{formatMaterialDisplay(loan)} · {loan.Fecha_Prestamo}</span>
-                  <span>{loan.Grupo_App}</span>
-                  <button className="btn success" onClick={() => closeLoan(loan)}>
-                    Devolver
-                  </button>
-                  <button className="btn danger" onClick={() => closeLoan(loan, 'Dañado', 'Dañado')}>
-                    Marcar dañado
-                  </button>
-                </div>
-              ))}
-            </section>
-
             <section className="card infodesk-profile-card">
               <h2>Perfil del alumno</h2>
 
@@ -1561,6 +1531,38 @@ export default function App() {
                 </section>
               )}
             </section>
+
+          </section>
+
+          <section className="right-column-stack">
+            {renderInternalCommunicationPanel()}
+
+            <section className="card infodesk-open-loans-card">
+              <div className="section-title-row">
+                <h2>Préstamos abiertos</h2>
+                <button className="btn secondary" onClick={() => setShowLoanHistory(true)}>
+                  Ver historial
+                </button>
+              </div>
+
+              {openLoans.length === 0 && <p>No hay préstamos abiertos.</p>}
+
+              {openLoans.map(loan => (
+                <div className="list-item" key={loan.ID_PRESTAMO}>
+                  <strong>{loan.Alumno}</strong>
+                  <span>{formatMaterialDisplay(loan)} · {loan.Fecha_Prestamo}</span>
+                  <span>{loan.Grupo_App}</span>
+                  <button className="btn success" onClick={() => closeLoan(loan)}>
+                    Devolver
+                  </button>
+                  <button className="btn danger" onClick={() => closeLoan(loan, 'Dañado', 'Dañado')}>
+                    Marcar dañado
+                  </button>
+                </div>
+              ))}
+            </section>
+
+
           </section>
         </main>
       )}
@@ -2028,7 +2030,8 @@ function InfodeskStudentProfile({ profile }) {
       <h3>{s.Nombre_Completo}</h3>
       <p><strong>Grupo:</strong> {s.Grupo_App}</p>
       <p><strong>Estado TUMO:</strong> {s.Estado_TUMO}</p>
-      <p><strong>Tutor TUMO:</strong> {s.Tutor_TUMO}</p>
+      <p><strong>Tutor TUMO:</strong> {getStudentCurrentTutor(s) || 'Sin dato'}</p>
+      <p><strong>Tutor anterior:</strong> {getStudentPreviousTutor(s) || 'Sin dato'}</p>
       <p><strong>Usuario:</strong> {s.Usuario}</p>
       <p><strong>CI:</strong> {s.CI || s.Documento || s.Cedula || s.Cédula}</p>
 
@@ -2124,7 +2127,8 @@ function StudentProfile({ profile, onAddComment }) {
       <h3>{s.Nombre_Completo}</h3>
 
       <p><strong>Grupo:</strong> {s.Grupo_App}</p>
-      <p><strong>Tutor:</strong> {s.Tutor_TUMO}</p>
+      <p><strong>Tutor TUMO:</strong> {getStudentCurrentTutor(s) || 'Sin dato'}</p>
+      <p><strong>Tutor anterior:</strong> {getStudentPreviousTutor(s) || 'Sin dato'}</p>
       <p><strong>Usuario:</strong> {s.Usuario}</p>
 
       <h3>Contacto familiar</h3>
@@ -2233,6 +2237,31 @@ function AttendanceDots({ items }) {
   );
 }
 
+
+
+function getStudentCurrentTutor(student = {}) {
+  return (
+    student.Tutor_TUMO_Actual ||
+    student.Tutor_TUMO ||
+    student.Tutor ||
+    student.Tutor_Actual ||
+    student.Nombre_Tutor_TUMO ||
+    student.Coach ||
+    ''
+  );
+}
+
+function getStudentPreviousTutor(student = {}) {
+  return (
+    student.Tutor_TUMO_Anterior ||
+    student.Tutor_Anterior ||
+    student.TutorAnterior ||
+    student.Coach_Anterior ||
+    student.CoachAnterior ||
+    student.Anterior_Tutor ||
+    ''
+  );
+}
 
 function formatMaterialDisplay(item = {}) {
   const tipo = item.Tipo_Material || item.Tipo || item.Material || '';
