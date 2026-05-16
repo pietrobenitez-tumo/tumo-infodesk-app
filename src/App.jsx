@@ -26,6 +26,13 @@ import {
 import './styles.css';
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => sessionStorage.getItem('tumo_session') === 'ok'
+  );
+  const [loggedUser, setLoggedUser] = useState(
+    () => sessionStorage.getItem('tumo_user') || ''
+  );
+
   const [view, setView] = useState('home');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
@@ -51,7 +58,6 @@ export default function App() {
   const [infodeskStudent, setInfodeskStudent] = useState(null);
   const [infodeskProfile, setInfodeskProfile] = useState(null);
 
-  const [loanMaterialId, setLoanMaterialId] = useState('');
   const [quickLoanSearch, setQuickLoanSearch] = useState('');
   const [quickLoanStudent, setQuickLoanStudent] = useState(null);
   const [quickLoanMaterialId, setQuickLoanMaterialId] = useState('');
@@ -91,8 +97,8 @@ export default function App() {
   const [showInfodeskTaskForm, setShowInfodeskTaskForm] = useState(false);
 
   useEffect(() => {
-    loadInitial();
-  }, []);
+    if (isLoggedIn) loadInitial();
+  }, [isLoggedIn]);
   useEffect(() => {
   if (!selectedTutor) return;
   if (!selectedGroup) return;
@@ -101,6 +107,24 @@ export default function App() {
 
   loadAttendanceForSelectedDate(selectedGroup, attendanceDate);
 }, [selectedTutor, selectedGroup, attendanceDate, tutorStudents.length]);
+
+  function handleLogin(username, password) {
+    if (!username.trim()) return 'Ingresá tu nombre de usuario.';
+    if (password !== import.meta.env.VITE_APP_PASSWORD) return 'Contraseña incorrecta.';
+    sessionStorage.setItem('tumo_session', 'ok');
+    sessionStorage.setItem('tumo_user', username.trim());
+    setLoggedUser(username.trim());
+    setIsLoggedIn(true);
+    return null;
+  }
+
+  function handleLogout() {
+    sessionStorage.removeItem('tumo_session');
+    sessionStorage.removeItem('tumo_user');
+    setIsLoggedIn(false);
+    setLoggedUser('');
+    setView('home');
+  }
 
   async function loadInitial() {
     try {
@@ -148,7 +172,6 @@ export default function App() {
       setInfodeskProfile(null);
       setCommentText('');
       setIncidentText('');
-      setLoanMaterialId('');
       setQuickLoanSearch('');
       setQuickLoanStudent(null);
       setQuickLoanMaterialId('');
@@ -333,33 +356,6 @@ export default function App() {
     }
   }
 
-  async function createNewLoan() {
-    try {
-      if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
-      if (!infodeskStudent) throw new Error('Seleccioná un alumno.');
-      if (!loanMaterialId) throw new Error('Seleccioná un material.');
-
-      const material = materials.find(m => String(m.ID_MATERIAL) === String(loanMaterialId));
-      const materialLabel = formatMaterialDisplay(material);
-
-      const res = await createLoan({
-        idAlumno: infodeskStudent.ID_ALUMNO,
-        idMaterial: loanMaterialId,
-        material: materialLabel,
-        personaInfodesk: selectedInfodesk
-      });
-
-      setStatus(res.message || 'Préstamo registrado.');
-      setLoanMaterialId('');
-      await refreshInfodesk();
-      await selectInfodeskStudent(infodeskStudent);
-      await refreshInitialWithoutLoading();
-    } catch (error) {
-      setStatus(error.message);
-    }
-  }
-
-
   async function createQuickLoan() {
     try {
       if (!selectedInfodesk) throw new Error('Seleccioná quién está registrando en Infodesk.');
@@ -380,7 +376,6 @@ export default function App() {
       setQuickLoanSearch('');
       setQuickLoanStudent(null);
       setQuickLoanMaterialId('');
-      setLoanMaterialId('');
 
       await refreshInfodesk();
       await refreshInitialWithoutLoading();
@@ -515,10 +510,11 @@ export default function App() {
 
     Object.keys(data.records || {}).forEach(idAlumno => {
       const record = data.records[idAlumno];
+      const estado = record.Estado || record.Estado_Asistencia || '';
 
       rows[String(idAlumno)] = {
-        estado: record.Estado || record.Estado_Asistencia || '',
-        horaLlegada: record.Hora_Llegada || '',
+        estado,
+        horaLlegada: record.Hora_Llegada || (estado === 'Tarde' ? currentTime() : ''),
         comentario: record.Comentario || ''
       };
     });
@@ -1399,6 +1395,10 @@ export default function App() {
     return alerts.filter(alert => normalize(alert.Tutor_TUMO) === normalize(selectedTutor.Nombre));
   }, [alerts, selectedTutor]);
 
+  if (!isLoggedIn) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
   if (loading) {
     return (
       <div className="page">
@@ -1417,11 +1417,17 @@ export default function App() {
           <p>Infodesk, tutores, talleristas y Team Lead.</p>
         </div>
 
-        {view !== 'home' && (
-          <button className="btn light" onClick={() => setView('home')}>
-            Volver al inicio
+        <div className="header-actions">
+          <span className="header-user">{loggedUser}</span>
+          {view !== 'home' && (
+            <button className="btn light" onClick={() => setView('home')}>
+              Inicio
+            </button>
+          )}
+          <button className="btn light" onClick={handleLogout}>
+            Cerrar sesión
           </button>
-        )}
+        </div>
       </header>
 
       {status && <div className="status">{status}</div>}
@@ -1829,11 +1835,7 @@ export default function App() {
             <label>Grupo</label>
             <select
               value={selectedGroup}
-              onChange={e => {
-                const group = e.target.value;
-                setSelectedGroup(group);
-                loadAttendanceForSelectedDate(group, attendanceDate);
-              }}
+              onChange={e => setSelectedGroup(e.target.value)}
             >
               <option value="">Seleccionar grupo</option>
               {tutorGroups.map(group => (
@@ -1845,11 +1847,7 @@ export default function App() {
             <input
               type="date"
               value={attendanceDate}
-              onChange={e => {
-                const date = e.target.value;
-                setAttendanceDate(date);
-                loadAttendanceForSelectedDate(selectedGroup, date);
-              }}
+              onChange={e => setAttendanceDate(e.target.value)}
             />
 
             <button className="btn success" onClick={saveGroupAttendance}>Guardar lista</button>
@@ -2450,7 +2448,7 @@ function getStudentPreviousTutor(student = {}) {
 
 function getMaterialSortValue(item = {}) {
   const display = formatMaterialDisplay(item);
-  const match = String(display || '').match(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)[\\s._-]*(\\d+)/);
+  const match = String(display || '').match(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)[\s._-]*(\d+)/);
 
   if (!match) {
     return {
@@ -2500,4 +2498,52 @@ function normalizeStatus(value) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
+}
+
+function LoginScreen({ onLogin }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const err = onLogin(username, password);
+    if (err) setError(err);
+  }
+
+  return (
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-logo">
+          <h1>TUMO</h1>
+          <p>Gesti\u00f3n interna</p>
+        </div>
+
+        <form className="login-form" onSubmit={handleSubmit}>
+          <label>Usuario</label>
+          <input
+            type="text"
+            value={username}
+            onChange={e => { setUsername(e.target.value); setError(''); }}
+            placeholder="Tu nombre..."
+            autoFocus
+          />
+
+          <label>Contrase&ntilde;a</label>
+          <input
+            type="password"
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError(''); }}
+            placeholder="********"
+          />
+
+          {error && <p className="login-error">{error}</p>}
+
+          <button type="submit" className="btn success login-btn">
+            Ingresar
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 }

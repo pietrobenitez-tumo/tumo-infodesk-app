@@ -1,7 +1,13 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbwnHG4HeRm0tavRPxhX9nYw3zR6m5D5lA7rHXrC_5_AyJ99R47Lds1bJzHwprTZM-0w/exec';
+const API_URL = import.meta.env.VITE_API_URL;
+const API_KEY = import.meta.env.VITE_API_KEY;
+
+if (!API_URL || !API_KEY) {
+  throw new Error('Faltan VITE_API_URL o VITE_API_KEY en el archivo .env. El sistema no puede funcionar sin estos valores.');
+}
 
 async function apiGet(action) {
-  const response = await fetch(`${API_URL}?action=${action}`);
+  const response = await fetch(`${API_URL}?action=${action}&key=${encodeURIComponent(API_KEY)}`);
+  if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
   const data = await response.json();
 
   if (!data.ok) {
@@ -14,8 +20,9 @@ async function apiGet(action) {
 async function apiPost(action, payload = {}) {
   const response = await fetch(`${API_URL}?action=${action}`, {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ ...payload, key: API_KEY })
   });
+  if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
 
   const data = await response.json();
 
@@ -86,10 +93,6 @@ export function saveIncident(data) {
   return apiPost('saveIncident', data);
 }
 
-export function createIncident(data) {
-  return apiPost('createIncident', data);
-}
-
 export function saveWorkshopAttendance(data) {
   return apiPost('saveWorkshopAttendance', data);
 }
@@ -110,7 +113,7 @@ export function getAttendanceForDate(data) {
 }
 
 export function getInfodeskTasks() {
-  return apiPost('getInfodeskTasks');
+  return apiGet('getInfodeskTasks');
 }
 
 export function saveInfodeskTask(data) {
