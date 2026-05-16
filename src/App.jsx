@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   getInitialData,
   getInfodeskData,
@@ -26,9 +26,12 @@ import {
 import './styles.css';
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    () => sessionStorage.getItem('tumo_session') === 'ok'
-  );
+  const [googleToken, setGoogleToken] = useState(() => {
+    const token = sessionStorage.getItem('tumo_token');
+    const expiry = sessionStorage.getItem('tumo_token_expiry');
+    if (token && expiry && Date.now() < Number(expiry)) return token;
+    return null;
+  });
   const [loggedUser, setLoggedUser] = useState(
     () => sessionStorage.getItem('tumo_user') || ''
   );
@@ -97,8 +100,8 @@ export default function App() {
   const [showInfodeskTaskForm, setShowInfodeskTaskForm] = useState(false);
 
   useEffect(() => {
-    if (isLoggedIn) loadInitial();
-  }, [isLoggedIn]);
+    if (googleToken) loadInitial();
+  }, [googleToken]);
   useEffect(() => {
   if (!selectedTutor) return;
   if (!selectedGroup) return;
@@ -108,20 +111,32 @@ export default function App() {
   loadAttendanceForSelectedDate(selectedGroup, attendanceDate);
 }, [selectedTutor, selectedGroup, attendanceDate, tutorStudents.length]);
 
-  function handleLogin(username, password) {
-    if (!username.trim()) return 'Ingresá tu nombre de usuario.';
-    if (password !== import.meta.env.VITE_APP_PASSWORD) return 'Contraseña incorrecta.';
-    sessionStorage.setItem('tumo_session', 'ok');
-    sessionStorage.setItem('tumo_user', username.trim());
-    setLoggedUser(username.trim());
-    setIsLoggedIn(true);
-    return null;
+  function handleGoogleCredential(response) {
+    try {
+      const token = response.credential;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      sessionStorage.setItem('tumo_token', token);
+      sessionStorage.setItem('tumo_token_expiry', String(payload.exp * 1000));
+      sessionStorage.setItem('tumo_user', payload.email);
+      setLoggedUser(payload.email);
+      setGoogleToken(token);
+    } catch {
+      console.error('Error al procesar el token de Google.');
+    }
   }
 
   function handleLogout() {
-    sessionStorage.removeItem('tumo_session');
+    try {
+      const token = sessionStorage.getItem('tumo_token');
+      if (token && window.google) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        window.google.accounts.id.revoke(payload.email, () => {});
+      }
+    } catch {}
+    sessionStorage.removeItem('tumo_token');
+    sessionStorage.removeItem('tumo_token_expiry');
     sessionStorage.removeItem('tumo_user');
-    setIsLoggedIn(false);
+    setGoogleToken(null);
     setLoggedUser('');
     setView('home');
   }
@@ -1395,8 +1410,8 @@ export default function App() {
     return alerts.filter(alert => normalize(alert.Tutor_TUMO) === normalize(selectedTutor.Nombre));
   }, [alerts, selectedTutor]);
 
-  if (!isLoggedIn) {
-    return <LoginScreen onLogin={handleLogin} />;
+  if (!googleToken) {
+    return <LoginScreen onCredential={handleGoogleCredential} />;
   }
 
   if (loading) {
@@ -2500,49 +2515,55 @@ function normalizeStatus(value) {
     .trim();
 }
 
-function LoginScreen({ onLogin }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+function LoginScreen({ onCredential }) {
+  const btnRef = useRef(null);
 
-  function handleSubmit(e) {
-    e.preventDefault();
-    const err = onLogin(username, password);
-    if (err) setError(err);
-  }
+  useEffect(() => {
+    function initGoogle() {
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: onCredential,
+        auto_select: false
+      });
+      if (btnRef.current) {
+        window.google.accounts.id.renderButton(btnRef.current, {
+          theme: 'outline',
+          size: 'large',
+          locale: 'es',
+          text: 'signin_with',
+          width: 280
+        });
+      }
+      window.google.accounts.id.prompt();
+    }
+
+    if (window.google?.accounts) {
+      initGoogle();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.onload = initGoogle;
+    document.head.appendChild(script);
+
+    return () => {
+      if (document.head.contains(script)) document.head.removeChild(script);
+    };
+  }, [onCredential]);
 
   return (
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
           <h1>TUMO</h1>
-          <p>Gesti\u00f3n interna</p>
+          <p>Gesti&oacute;n interna</p>
         </div>
-
-        <form className="login-form" onSubmit={handleSubmit}>
-          <label>Usuario</label>
-          <input
-            type="text"
-            value={username}
-            onChange={e => { setUsername(e.target.value); setError(''); }}
-            placeholder="Tu nombre..."
-            autoFocus
-          />
-
-          <label>Contrase&ntilde;a</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setError(''); }}
-            placeholder="********"
-          />
-
-          {error && <p className="login-error">{error}</p>}
-
-          <button type="submit" className="btn success login-btn">
-            Ingresar
-          </button>
-        </form>
+        <p className="login-subtitle">
+          Ingres&aacute; con tu cuenta Google autorizada para acceder al sistema.
+        </p>
+        <div ref={btnRef} className="google-signin-btn" />
       </div>
     </div>
   );

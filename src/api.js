@@ -5,8 +5,15 @@ if (!API_URL || !API_KEY) {
   throw new Error('Faltan VITE_API_URL o VITE_API_KEY en el archivo .env. El sistema no puede funcionar sin estos valores.');
 }
 
+function getToken() {
+  return sessionStorage.getItem('tumo_token') || '';
+}
+
 async function apiGet(action) {
-  const response = await fetch(`${API_URL}?action=${action}&key=${encodeURIComponent(API_KEY)}`);
+  const token = encodeURIComponent(getToken());
+  const response = await fetch(
+    `${API_URL}?action=${action}&key=${encodeURIComponent(API_KEY)}&token=${token}`
+  );
   if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
   const data = await response.json();
 
@@ -20,7 +27,7 @@ async function apiGet(action) {
 async function apiPost(action, payload = {}) {
   const response = await fetch(`${API_URL}?action=${action}`, {
     method: 'POST',
-    body: JSON.stringify({ ...payload, key: API_KEY })
+    body: JSON.stringify({ ...payload, key: API_KEY, token: getToken() })
   });
   if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
 

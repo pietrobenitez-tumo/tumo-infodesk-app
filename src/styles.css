@@ -1331,6 +1331,20 @@ textarea {
   font-size: 1rem;
 }
 
+.login-subtitle {
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.google-signin-btn {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
 /* ── Header usuario ── */
 
 .header-actions {
