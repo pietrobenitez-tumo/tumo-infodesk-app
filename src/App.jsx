@@ -517,7 +517,7 @@ export default function App() {
       const record = data.records[idAlumno];
 
       rows[String(idAlumno)] = {
-        estado: record.Estado || record.Estado_Asistencia || 'Presente',
+        estado: record.Estado || record.Estado_Asistencia || '',
         horaLlegada: record.Hora_Llegada || '',
         comentario: record.Comentario || ''
       };
@@ -531,14 +531,19 @@ export default function App() {
   function setAttendance(idAlumno, estado) {
     const key = String(idAlumno);
 
-    setAttendanceRows(prev => ({
-      ...prev,
-      [key]: {
-        ...(prev[key] || {}),
-        estado,
-        horaLlegada: estado === 'Tarde' ? (prev[key]?.horaLlegada || currentTime()) : ''
-      }
-    }));
+    setAttendanceRows(prev => {
+      const current = prev[key] || {};
+      const nextEstado = current.estado === estado ? '' : estado;
+
+      return {
+        ...prev,
+        [key]: {
+          ...current,
+          estado: nextEstado,
+          horaLlegada: nextEstado === 'Tarde' ? (current.horaLlegada || currentTime()) : ''
+        }
+      };
+    });
   }
 
   function setAttendanceComment(idAlumno, comentario) {
@@ -581,16 +586,22 @@ export default function App() {
 
       const groupStudents = tutorStudents.filter(s => s.Grupo_App === selectedGroup);
 
-      const registros = groupStudents.map(s => {
-  const row = attendanceRows[String(s.ID_ALUMNO)] || {};
+      const registros = groupStudents
+        .map(s => {
+          const row = attendanceRows[String(s.ID_ALUMNO)] || {};
 
-  return {
-    idAlumno: s.ID_ALUMNO,
-    estado: row.estado || 'Presente',
-    horaLlegada: row.horaLlegada || '',
-    comentario: row.comentario || ''
-  };
-});
+          return {
+            idAlumno: s.ID_ALUMNO,
+            estado: row.estado || '',
+            horaLlegada: row.horaLlegada || '',
+            comentario: row.comentario || ''
+          };
+        })
+        .filter(r => String(r.estado || '').trim());
+
+      if (registros.length === 0) {
+        throw new Error('No marcaste ninguna asistencia para guardar.');
+      }
       const res = await saveAttendance({
         fecha: attendanceDate,
         grupo: selectedGroup,
@@ -1873,7 +1884,7 @@ export default function App() {
             <div className="attendance-list">
               {groupStudents.map(student => {
                 const row = attendanceRows[String(student.ID_ALUMNO)] || {};
-                const estado = row.estado || 'Presente';
+                const estado = row.estado || '';
 
                 return (
                   <div className="attendance-row-card" key={student.ID_ALUMNO}>
@@ -2349,10 +2360,11 @@ function StudentProfile({ profile, onAddComment }) {
 function buildAttendanceDotsItems(items, currentRow, currentDate) {
   const cleanItems = [...items].filter(item => String(item.Fecha) !== String(currentDate));
 
-  if (currentRow && currentRow.estado) {
+  if (currentRow && String(currentRow.estado || '').trim()) {
     cleanItems.push({
       Fecha: currentDate,
       Estado: currentRow.estado,
+      Estado_Asistencia: currentRow.estado,
       estado: currentRow.estado,
       Hora_Llegada: currentRow.horaLlegada || '',
       Comentario: currentRow.comentario || '',
@@ -2378,7 +2390,7 @@ function AttendanceDots({ items }) {
           return <span key={index} className="dot empty" title="Sin registro" />;
         }
 
-        const rawEstado = item.Estado || item.estado || '';
+        const rawEstado = item.Estado || item.Estado_Asistencia || item.estado || '';
         const estado = normalizeStatus(rawEstado);
         const comentario = item.Comentario || item.comentario || '';
         const hasComment = Boolean(String(comentario).trim());
